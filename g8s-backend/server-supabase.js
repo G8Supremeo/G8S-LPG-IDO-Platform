@@ -37,7 +37,9 @@ const app = express();
 const server = http.createServer(app);
 
 // WebSocket server for real-time updates
-const wss = new WebSocketServer({ server });
+const wss = new WebSocket.Server({ server });
+// Behind proxy (Railway/Render) - trust X-Forwarded-* headers
+app.set('trust proxy', 1);
 
 // Initialize Supabase service
 const supabaseService = new SupabaseService();
@@ -287,3 +289,4 @@ process.on('SIGINT', () => {
     console.log('Process terminated');
   });
 });
+
