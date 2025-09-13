@@ -4,6 +4,7 @@
   "private": true,
   "license": "MIT",
   "type": "commonjs",
+  "engines": { "node": ">=20" }
   "scripts": {
     "dev": "nodemon server-supabase.js",
     "dev:supabase": "nodemon server-supabase.js",
