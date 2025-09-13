@@ -1,3 +1,4 @@
+// server-supabase.js
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -37,13 +38,24 @@ const app = express();
 const server = http.createServer(app);
 
 // WebSocket server for real-time updates
-const wss = new WebSocketServer({ server });
+const wss = new WebSocket.Server({ server });
 
-// Initialize Supabase service
-const supabaseService = new SupabaseService();
+// Behind proxy (Railway/Render) - trust X-Forwarded-* headers
+app.set('trust proxy', 1);
 
-// Make Supabase service available globally
-global.supabaseService = supabaseService;
+// Initialize Supabase service safely
+let supabaseService = null;
+
+if (!global.supabaseService) {
+  supabaseService = new SupabaseService();
+  global.supabaseService = supabaseService;
+
+  if (!supabaseService.client) {
+    console.error("❌ Supabase client not initialized due to missing env vars!");
+  }
+} else {
+  supabaseService = global.supabaseService;
+}
 
 // Middleware
 app.use(helmet({
@@ -106,7 +118,6 @@ wss.on('connection', (ws, req) => {
       const data = JSON.parse(message);
       console.log('Received message:', data);
       
-      // Handle different message types
       switch (data.type) {
         case 'subscribe':
           ws.subscription = data.channel;
@@ -144,7 +155,6 @@ global.broadcast = broadcast;
 
 // Initialize services
 const initializeServices = async () => {
-  // Initialize blockchain service (with error handling)
   try {
     await blockchainService.initialize();
     console.log('✅ Blockchain service initialized successfully');
@@ -153,7 +163,6 @@ const initializeServices = async () => {
     console.log('⚠️  Continuing without blockchain service...');
   }
   
-  // Initialize other services
   try {
     await notificationService.initialize();
     console.log('✅ Notification service initialized successfully');
@@ -169,8 +178,7 @@ const initializeServices = async () => {
     console.error('❌ Email service initialization failed:', error.message);
     console.log('⚠️  Continuing without email service...');
   }
-  
-  // Start scheduled tasks
+
   startScheduledTasks();
 };
 
@@ -179,20 +187,23 @@ const startApp = async () => {
   console.log('🚀 Starting G8S LPG Backend with Supabase...');
   
   // Test Supabase connection
-  try {
-    const { data, error } = await supabaseService.client
-      .from('users')
-      .select('count')
-      .limit(1);
-    
-    if (error) {
-      console.error('❌ Supabase connection failed:', error.message);
-      console.log('⚠️  Please check your Supabase configuration');
-    } else {
-      console.log('✅ Supabase connection successful');
+  if (supabaseService && supabaseService.client) {
+    try {
+      const { data, error } = await supabaseService.client
+        .from('users')
+        .select('id')
+        .limit(1);
+
+      if (error) {
+        console.error('❌ Supabase connection failed:', error.message);
+      } else {
+        console.log('✅ Supabase connection successful');
+      }
+    } catch (error) {
+      console.error('❌ Supabase connection error:', error.message);
     }
-  } catch (error) {
-    console.error('❌ Supabase connection error:', error.message);
+  } else {
+    console.warn('⚠️ Supabase client not initialized. Skipping connection test.');
   }
 
   await initializeServices();

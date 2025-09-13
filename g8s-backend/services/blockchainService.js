@@ -49,8 +49,8 @@ class BlockchainService {
 
   async loadContracts() {
     try {
-      // Load G8S Token contract
-      const g8sTokenABI = require('../contracts/abi/G8SToken.json');
+      // Load G8S Token contract (case-sensitive on Linux)
+      const g8sTokenABI = require('../contracts/abi/g8sToken.json');
       const g8sTokenAddress = process.env.G8S_TOKEN_ADDRESS;
       
       if (g8sTokenAddress) {
@@ -61,8 +61,8 @@ class BlockchainService {
         );
       }
 
-      // Load G8S IDO contract
-      const g8sIdoABI = require('../contracts/abi/G8SIDO.json');
+      // Load G8S IDO contract (case-sensitive on Linux)
+      const g8sIdoABI = require('../contracts/abi/g8sIdo.json');
       const g8sIdoAddress = process.env.G8S_IDO_ADDRESS;
       
       if (g8sIdoAddress) {

@@ -4,10 +4,11 @@
   "private": true,
   "license": "MIT",
   "type": "commonjs",
+  "engines": { "node": ">=20" },
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "nodemon server-supabase.js",
     "dev:supabase": "nodemon server-supabase.js",
-    "start": "node server.js",
+    "start": "node server-supabase.js",
     "start:supabase": "node server-supabase.js",
     "build": "echo 'No build step required for Node.js'",
     "test": "jest",
@@ -19,6 +20,7 @@
     "migrate": "node scripts/migrate.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "ethers": "^6.15.0",
