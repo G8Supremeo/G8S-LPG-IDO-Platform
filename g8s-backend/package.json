@@ -5,9 +5,9 @@
   "license": "MIT",
   "type": "commonjs",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "nodemon server-supabase.js",
     "dev:supabase": "nodemon server-supabase.js",
-    "start": "node server.js",
+    "start": "node server-supabase.js",
     "start:supabase": "node server-supabase.js",
     "build": "echo 'No build step required for Node.js'",
     "test": "jest",
