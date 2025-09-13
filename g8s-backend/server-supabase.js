@@ -43,8 +43,6 @@ app.set('trust proxy', 1);
 
 // Initialize Supabase service
 const supabaseService = new SupabaseService();
-// Initialize Supabase service
-const supabaseService = new SupabaseService();
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
   console.error("❌ Supabase environment variables missing!");
   console.error("SUPABASE_URL:", process.env.SUPABASE_URL || "❌ Missing");
