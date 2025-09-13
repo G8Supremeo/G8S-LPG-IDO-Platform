@@ -23,6 +23,20 @@ const TABLES = {
 // Supabase service functions
 class SupabaseService {
   constructor() {
+    // --- ADD THESE LINES AT THE VERY TOP ---
+    console.log("🔎 [Supabase Config]");
+    console.log("SUPABASE_URL:", process.env.SUPABASE_URL || "❌ Missing");
+    console.log("SUPABASE_ANON_KEY:", process.env.SUPABASE_ANON_KEY ? "✅ Loaded" : "❌ Missing");
+
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+      console.error("❌ Supabase initialization failed: Missing SUPABASE_URL or SUPABASE_ANON_KEY.");
+      this.client = null;
+      this.admin = null;
+      return;
+    }
+    // --- END ADD ---
+
+    // Original constructor code
     this.client = supabase;
     this.admin = supabaseAdmin;
     this.tables = TABLES;
