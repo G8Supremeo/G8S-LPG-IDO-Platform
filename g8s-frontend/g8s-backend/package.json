@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "g8s-frontend": "file:.."
+  }
+}

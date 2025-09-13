@@ -1,0 +1,13 @@
+# Backend Environment Variables
+PORT=4000
+NODE_ENV=development
+
+# Blockchain Configuration
+SEPOLIA_RPC_URL=https://sepolia.drpc.org
+IDO_ADDRESS=0x182a1b31e2C57B44D6700eEBBD6733511b559782
+G8S_TOKEN_ADDRESS=0xCe28Eb32bbd8c66749b227A860beFcC12e612295
+PUSD_ADDRESS=0xDd7639e3920426de6c59A1009C7ce2A9802d0920
+
+# Optional: Database Configuration (for future use)
+# DATABASE_URL=mongodb://localhost:27017/g8s_ido
+# REDIS_URL=redis://localhost:6379

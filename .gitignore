@@ -1,0 +1,10 @@
+# Ignore dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Env files
+.env
