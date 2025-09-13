@@ -7,8 +7,8 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY || 'your-anon-key';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || 'your-service-key';
 
 // Create Supabase client
-const supabase = createClient(supabaseUrl, supabaseKey);
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+let supabase = null;
+let supabaseAdmin = null;
 
 // Database tables configuration
 const TABLES = {
@@ -23,10 +23,11 @@ const TABLES = {
 // Supabase service functions
 class SupabaseService {
   constructor() {
-    // --- ADD THESE LINES AT THE VERY TOP ---
+    // Debug logging
     console.log("🔎 [Supabase Config]");
     console.log("SUPABASE_URL:", process.env.SUPABASE_URL || "❌ Missing");
     console.log("SUPABASE_ANON_KEY:", process.env.SUPABASE_ANON_KEY ? "✅ Loaded" : "❌ Missing");
+    console.log("SUPABASE_SERVICE_KEY:", process.env.SUPABASE_SERVICE_KEY ? "✅ Loaded" : "❌ Missing");
 
     if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
       console.error("❌ Supabase initialization failed: Missing SUPABASE_URL or SUPABASE_ANON_KEY.");
@@ -34,9 +35,11 @@ class SupabaseService {
       this.admin = null;
       return;
     }
-    // --- END ADD ---
 
-    // Original constructor code
+    // Initialize clients
+    supabase = createClient(supabaseUrl, supabaseKey);
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
     this.client = supabase;
     this.admin = supabaseAdmin;
     this.tables = TABLES;
@@ -48,7 +51,6 @@ class SupabaseService {
       .from(this.tables.USERS)
       .insert([userData])
       .select();
-    
     if (error) throw error;
     return data[0];
   }
@@ -59,7 +61,6 @@ class SupabaseService {
       .select('*')
       .eq('wallet_address', walletAddress)
       .single();
-    
     if (error && error.code !== 'PGRST116') throw error;
     return data;
   }
@@ -70,7 +71,6 @@ class SupabaseService {
       .update(updates)
       .eq('id', id)
       .select();
-    
     if (error) throw error;
     return data[0];
   }
@@ -81,7 +81,6 @@ class SupabaseService {
       .from(this.tables.TRANSACTIONS)
       .insert([transactionData])
       .select();
-    
     if (error) throw error;
     return data[0];
   }
@@ -93,7 +92,6 @@ class SupabaseService {
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
-    
     if (error) throw error;
     return data;
   }
@@ -104,7 +102,6 @@ class SupabaseService {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(limit);
-    
     if (error) throw error;
     return data;
   }
@@ -116,7 +113,6 @@ class SupabaseService {
       .select('*')
       .eq('address', tokenAddress)
       .single();
-    
     if (error && error.code !== 'PGRST116') throw error;
     return data;
   }
@@ -126,7 +122,6 @@ class SupabaseService {
       .from(this.tables.TOKENS)
       .upsert({ address: tokenAddress, ...updates })
       .select();
-    
     if (error) throw error;
     return data[0];
   }
@@ -139,7 +134,6 @@ class SupabaseService {
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
-    
     if (error && error.code !== 'PGRST116') throw error;
     return data;
   }
@@ -149,7 +143,6 @@ class SupabaseService {
       .from(this.tables.ANALYTICS)
       .upsert(analyticsData)
       .select();
-    
     if (error) throw error;
     return data[0];
   }
@@ -160,7 +153,6 @@ class SupabaseService {
       .from(this.tables.NOTIFICATIONS)
       .insert([notificationData])
       .select();
-    
     if (error) throw error;
     return data[0];
   }
@@ -172,7 +164,6 @@ class SupabaseService {
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
-    
     if (error) throw error;
     return data;
   }
@@ -183,7 +174,6 @@ class SupabaseService {
       .from(this.tables.IDO_SETTINGS)
       .select('*')
       .single();
-    
     if (error && error.code !== 'PGRST116') throw error;
     return data;
   }
@@ -193,7 +183,6 @@ class SupabaseService {
       .from(this.tables.IDO_SETTINGS)
       .upsert(settings)
       .select();
-    
     if (error) throw error;
     return data[0];
   }
@@ -222,7 +211,6 @@ class SupabaseService {
       `)
       .order('created_at', { ascending: false })
       .limit(limit);
-    
     if (error) throw error;
     return data;
   }
