@@ -39,6 +39,9 @@ const server = http.createServer(app);
 // WebSocket server for real-time updates
 const wss = new WebSocket.Server({ server });
 
+// Behind proxy (Railway/Render) - trust X-Forwarded-* headers
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
