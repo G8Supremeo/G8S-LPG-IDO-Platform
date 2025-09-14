@@ -15,14 +15,26 @@ class BlockchainService {
 
   async initialize() {
     try {
-      // Check if RPC URL is available (no private key needed for read-only operations)
-      if (!process.env.SEPOLIA_RPC_URL || process.env.SEPOLIA_RPC_URL === 'https://sepolia.infura.io/v3/your-infura-project-id') {
-        console.log('⚠️  Blockchain RPC URL not configured - using public endpoints');
-        // Use public RPC endpoints as fallback
-        this.provider = new ethers.JsonRpcProvider('https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161');
+      // Prefer WebSocket provider if provided (required for subscriptions)
+      const wsUrl = (process.env.SEPOLIA_WS_URL || '').trim();
+      const httpUrl = (process.env.SEPOLIA_RPC_URL || '').trim();
+
+      if (wsUrl) {
+        try {
+          this.provider = new ethers.WebSocketProvider(wsUrl);
+          console.log('✅ Using WebSocket provider for blockchain events');
+        } catch (e) {
+          console.warn('⚠️  Failed to initialize WebSocket provider, falling back to HTTP:', e.message);
+          this.provider = httpUrl
+            ? new ethers.JsonRpcProvider(httpUrl)
+            : new ethers.JsonRpcProvider('https://sepolia.drpc.org');
+        }
+      } else if (httpUrl) {
+        this.provider = new ethers.JsonRpcProvider(httpUrl);
+        console.log('ℹ️ Using HTTP provider (event subscriptions will be disabled)');
       } else {
-        // Initialize provider with configured RPC URL
-        this.provider = new ethers.JsonRpcProvider(process.env.SEPOLIA_RPC_URL);
+        console.log('⚠️  Blockchain RPC URL not configured - using public endpoint');
+        this.provider = new ethers.JsonRpcProvider('https://sepolia.drpc.org');
       }
       
       // No wallet needed for read-only operations
@@ -32,7 +44,7 @@ class BlockchainService {
       // Load contract ABIs and addresses
       await this.loadContracts();
       
-      // Start event listeners (read-only)
+      // Start event listeners (only if provider supports subscriptions)
       await this.startEventListeners();
       
       // Update token prices
@@ -132,13 +144,20 @@ class BlockchainService {
 
   async startEventListeners() {
     try {
+      const supportsSubscriptions = typeof this.provider.on === 'function' && this.provider._isWebSocket;
+
+      if (!supportsSubscriptions) {
+        console.log('ℹ️ Provider does not support subscriptions. Skipping event listeners.');
+        return;
+      }
+
       // Listen to G8S Token events
-      if (this.contracts.g8sToken) {
+      if (this.contracts.g8sToken && typeof this.contracts.g8sToken.on === 'function') {
         this.contracts.g8sToken.on('Transfer', this.handleTokenTransfer.bind(this));
       }
 
       // Listen to IDO events
-      if (this.contracts.g8sIdo) {
+      if (this.contracts.g8sIdo && typeof this.contracts.g8sIdo.on === 'function') {
         this.contracts.g8sIdo.on('TokensPurchased', this.handleTokensPurchased.bind(this));
         this.contracts.g8sIdo.on('SalePaused', this.handleSalePaused.bind(this));
         this.contracts.g8sIdo.on('SaleResumed', this.handleSaleResumed.bind(this));
@@ -147,7 +166,7 @@ class BlockchainService {
       }
 
       // Listen to PUSD events
-      if (this.contracts.pusd) {
+      if (this.contracts.pusd && typeof this.contracts.pusd.on === 'function') {
         this.contracts.pusd.on('Transfer', this.handlePusdTransfer.bind(this));
       }
 
