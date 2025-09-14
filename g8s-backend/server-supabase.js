@@ -241,6 +241,8 @@ startApp();
 
 // Scheduled tasks
 function startScheduledTasks() {
+  const USE_MONGO = (process.env.USE_MONGO || '').toLowerCase() === 'true';
+
   // Update token prices every 5 minutes
   cron.schedule('*/5 * * * *', async () => {
     try {
@@ -256,7 +258,7 @@ function startScheduledTasks() {
   // Process pending transactions every minute
   cron.schedule('* * * * *', async () => {
     try {
-      if (blockchainService.isInitialized) {
+      if (blockchainService.isInitialized && USE_MONGO) {
         await blockchainService.processPendingTransactions();
         console.log('Pending transactions processed');
       }
@@ -278,7 +280,7 @@ function startScheduledTasks() {
   // Clean up old notifications daily
   cron.schedule('0 0 * * *', async () => {
     try {
-      if (notificationService.isInitialized) {
+      if (notificationService.isInitialized && USE_MONGO) {
         await notificationService.cleanupOldNotifications();
         console.log('Old notifications cleaned up');
       }

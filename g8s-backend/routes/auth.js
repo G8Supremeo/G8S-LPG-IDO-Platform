@@ -2,7 +2,12 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const User = require('../models/User');
+const USE_MONGO = (process.env.USE_MONGO || '').toLowerCase() === 'true';
+let User;
+if (USE_MONGO) {
+  User = require('../models/User');
+}
+const { SupabaseService } = require('../supabase-config');
 const { protect } = require('../middleware/auth');
 const { 
   validateUserRegistration, 
@@ -14,6 +19,7 @@ const notificationService = require('../services/notificationService');
 const emailService = require('../services/emailService');
 
 const router = express.Router();
+const supabaseService = global.supabaseService || new SupabaseService();
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -25,82 +31,77 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Register user
+// @desc    Register user (Supabase-native if USE_MONGO=false)
 // @route   POST /api/auth/register
 // @access  Public
 router.post('/register', validateUserRegistration, async (req, res) => {
   try {
     const { email, password, firstName, lastName } = req.body;
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        error: 'User already exists with this email'
+    if (!USE_MONGO) {
+      if (!supabaseService || !supabaseService.admin || !supabaseService.client) {
+        return res.status(500).json({ success: false, error: 'Supabase not configured' });
+      }
+
+      // Create auth user
+      const { data: created, error: createErr } = await supabaseService.admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: false,
+        user_metadata: { firstName, lastName }
+      });
+      if (createErr) {
+        return res.status(400).json({ success: false, error: createErr.message });
+      }
+
+      const authUser = created.user;
+
+      // Upsert profile row in users table
+      const { error: upsertErr } = await supabaseService.client
+        .from(supabaseService.tables.USERS)
+        .upsert({
+          id: authUser.id,
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          is_active: true
+        });
+      if (upsertErr) {
+        return res.status(400).json({ success: false, error: upsertErr.message });
+      }
+
+      const token = generateToken(authUser.id);
+      return res.status(201).json({
+        success: true,
+        data: {
+          user: {
+            id: authUser.id,
+            email,
+            firstName,
+            lastName,
+            emailVerified: !!authUser.email_confirmed_at,
+            accountStatus: 'active'
+          },
+          token
+        },
+        message: 'User registered successfully. Please verify your email from Supabase.'
       });
     }
 
-    // Create user
-    const user = await User.create({
-      email,
-      password,
-      firstName,
-      lastName,
-      metadata: {
-        source: 'web',
-        userAgent: req.get('User-Agent'),
-        ipAddress: req.ip,
-        country: req.get('CF-IPCountry') || 'Unknown',
-        city: req.get('CF-IPCity') || 'Unknown'
-      }
-    });
-
-    // Generate email verification token
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = emailVerificationToken;
-    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-    await user.save();
-
-    // Send welcome email
-    try {
-      await emailService.sendWelcomeEmail(user);
-    } catch (emailError) {
-      console.error('Error sending welcome email:', emailError);
+    // Legacy Mongo path
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, error: 'User already exists with this email' });
     }
-
-    // Send email verification
-    try {
-      await emailService.sendEmailVerificationEmail(user, emailVerificationToken);
-    } catch (emailError) {
-      console.error('Error sending email verification:', emailError);
-    }
-
-    // Generate token
+    const user = await User.create({ email, password, firstName, lastName });
     const token = generateToken(user._id);
-
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          emailVerified: user.emailVerified,
-          accountStatus: user.accountStatus,
-          referralCode: user.referralCode
-        },
-        token
-      },
-      message: 'User registered successfully. Please check your email to verify your account.'
+      data: { user: { id: user._id, email, firstName, lastName }, token }
     });
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Server error during registration'
-    });
+    res.status(500).json({ success: false, error: 'Server error during registration' });
   }
 });
 
@@ -111,73 +112,50 @@ router.post('/login', validateUserLogin, async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check for user
-    const user = await User.findOne({ email }).select('+password');
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid credentials'
-      });
-    }
-
-    // Check if account is locked
-    if (user.isLocked()) {
-      return res.status(401).json({
-        success: false,
-        error: 'Account is temporarily locked due to multiple failed login attempts'
-      });
-    }
-
-    // Check password
-    const isMatch = await user.comparePassword(password);
-
-    if (!isMatch) {
-      // Increment login attempts
-      await user.incLoginAttempts();
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid credentials'
-      });
-    }
-
-    // Reset login attempts on successful login
-    if (user.loginAttempts > 0) {
-      await user.resetLoginAttempts();
-    }
-
-    // Update last login
-    user.lastLogin = new Date();
-    user.lastActivity = new Date();
-    await user.save();
-
-    // Generate token
-    const token = generateToken(user._id);
-
-    res.json({
-      success: true,
-      data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          emailVerified: user.emailVerified,
-          accountStatus: user.accountStatus,
-          walletConnected: user.walletConnected,
-          kycStatus: user.kycStatus,
-          referralCode: user.referralCode,
-          investmentProfile: user.investmentProfile
-        },
-        token
+    if (!USE_MONGO) {
+      if (!supabaseService || !supabaseService.client) {
+        return res.status(500).json({ success: false, error: 'Supabase not configured' });
       }
-    });
+
+      const { data, error } = await supabaseService.client.auth.signInWithPassword({ email, password });
+      if (error || !data.user) {
+        return res.status(401).json({ success: false, error: 'Invalid credentials' });
+      }
+
+      const userId = data.user.id;
+      const { data: profile } = await supabaseService.client
+        .from(supabaseService.tables.USERS)
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      const token = generateToken(userId);
+      return res.json({
+        success: true,
+        data: {
+          user: {
+            id: userId,
+            email: data.user.email,
+            firstName: profile?.first_name || '',
+            lastName: profile?.last_name || '',
+            emailVerified: !!data.user.email_confirmed_at,
+            accountStatus: profile?.is_active ? 'active' : 'inactive'
+          },
+          token
+        }
+      });
+    }
+
+    // Legacy Mongo path
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) return res.status(401).json({ success: false, error: 'Invalid credentials' });
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) return res.status(401).json({ success: false, error: 'Invalid credentials' });
+    const token = generateToken(user._id);
+    return res.json({ success: true, data: { user: { id: user._id, email: user.email }, token } });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Server error during login'
-    });
+    res.status(500).json({ success: false, error: 'Server error during login' });
   }
 });
 
@@ -186,36 +164,27 @@ router.post('/login', validateUserLogin, async (req, res) => {
 // @access  Private
 router.get('/me', protect, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
-
-    res.json({
-      success: true,
-      data: {
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          emailVerified: user.emailVerified,
-          accountStatus: user.accountStatus,
-          walletConnected: user.walletConnected,
-          walletAddress: user.walletAddress,
-          walletProvider: user.walletProvider,
-          kycStatus: user.kycStatus,
-          referralCode: user.referralCode,
-          investmentProfile: user.investmentProfile,
-          preferences: user.preferences,
-          createdAt: user.createdAt,
-          lastLogin: user.lastLogin
+    if (!USE_MONGO) {
+      const user = req.user; // set in middleware from Supabase
+      return res.json({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.first_name || '',
+            lastName: user.last_name || '',
+            accountStatus: user.is_active ? 'active' : 'inactive'
+          }
         }
-      }
-    });
+      });
+    }
+
+    const user = await User.findById(req.user._id).select('-password');
+    return res.json({ success: true, data: { user } });
   } catch (error) {
     console.error('Get current user error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Server error'
-    });
+    res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 

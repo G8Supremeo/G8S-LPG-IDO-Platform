@@ -10,7 +10,9 @@ import {
   useWriteContract, 
   useWaitForTransactionReceipt 
 } from "wagmi";
-import { parseEther, formatEther, formatUnits } from "viem";
+import { parseEther, parseUnits, formatEther, formatUnits } from "viem";
+import { useChainId, useSwitchChain } from "wagmi";
+import { sepolia } from "wagmi/chains";
 import { 
   Zap, 
   ArrowRight, 
@@ -29,6 +31,8 @@ interface IDOPurchaseProps {
 
 export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
   const [tokenAmount, setTokenAmount] = useState("");
   const [pusdAmount, setPusdAmount] = useState("");
   const [isApproving, setIsApproving] = useState(false);
@@ -42,6 +46,12 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   const { data: pusdBalance } = useBalance({
     address,
     token: CONTRACTS.PUSD_ADDRESS as `0x${string}`,
+  });
+
+  const { data: pusdDecimals } = useReadContract({
+    address: CONTRACTS.PUSD_ADDRESS as `0x${string}`,
+    abi: ABI.ERC20,
+    functionName: "decimals",
   });
 
   const { data: pusdAllowance } = useReadContract({
@@ -118,7 +128,11 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     setError("");
 
     try {
-      const amount = parseEther(pusdAmount);
+      if (chainId !== sepolia.id) {
+        await switchChainAsync({ chainId: sepolia.id });
+      }
+      const decimals = typeof pusdDecimals === 'number' ? pusdDecimals : 18;
+      const amount = parseUnits(pusdAmount, decimals);
       const hash = await writeContractAsync({
         address: CONTRACTS.PUSD_ADDRESS as `0x${string}`,
         abi: ABI.ERC20,
@@ -142,7 +156,11 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     setError("");
 
     try {
-      const amount = parseEther(pusdAmount);
+      if (chainId !== sepolia.id) {
+        await switchChainAsync({ chainId: sepolia.id });
+      }
+      const decimals = typeof pusdDecimals === 'number' ? pusdDecimals : 18;
+      const amount = parseUnits(pusdAmount, decimals);
       const hash = await writeContractAsync({
         address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
         abi: ABI.IDO,

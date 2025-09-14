@@ -1,5 +1,11 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const USE_MONGO = (process.env.USE_MONGO || '').toLowerCase() === 'true';
+let User;
+if (USE_MONGO) {
+  User = require('../models/User');
+}
+const { SupabaseService } = require('../supabase-config');
+const supabaseService = global.supabaseService || new SupabaseService();
 
 // Protect routes
 const protect = async (req, res, next) => {
@@ -14,7 +20,21 @@ const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // Get user from the token
-      req.user = await User.findById(decoded.id).select('-password');
+      if (USE_MONGO) {
+        req.user = await User.findById(decoded.id).select('-password');
+      } else if (supabaseService && supabaseService.client) {
+        const { data: userRow, error } = await supabaseService.client
+          .from(supabaseService.tables.USERS)
+          .select('*')
+          .eq('id', decoded.id)
+          .single();
+        if (error) {
+          throw error;
+        }
+        req.user = userRow;
+      } else {
+        req.user = null;
+      }
 
       if (!req.user) {
         return res.status(401).json({
@@ -32,7 +52,7 @@ const protect = async (req, res, next) => {
       }
 
       // Check if account is locked
-      if (req.user.isLocked()) {
+      if (USE_MONGO && req.user && typeof req.user.isLocked === 'function' && req.user.isLocked()) {
         return res.status(401).json({
           success: false,
           error: 'Account is temporarily locked due to multiple failed login attempts'
@@ -112,12 +132,13 @@ const isOwnerOrAdmin = (req, res, next) => {
   }
 
   // Check if user is the owner of the resource
-  if (req.params.userId && req.user._id.toString() === req.params.userId) {
+  const currentUserId = req.user._id ? req.user._id.toString() : String(req.user.id);
+  if (req.params.userId && currentUserId === req.params.userId) {
     return next();
   }
 
   // Check if user is the owner of the resource in body
-  if (req.body.userId && req.user._id.toString() === req.body.userId) {
+  if (req.body.userId && currentUserId === req.body.userId) {
     return next();
   }
 
@@ -192,7 +213,18 @@ const optionalAuth = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select('-password');
+      if (USE_MONGO) {
+        req.user = await User.findById(decoded.id).select('-password');
+      } else if (supabaseService && supabaseService.client) {
+        const { data: userRow } = await supabaseService.client
+          .from(supabaseService.tables.USERS)
+          .select('*')
+          .eq('id', decoded.id)
+          .single();
+        req.user = userRow || null;
+      } else {
+        req.user = null;
+      }
     } catch (error) {
       // Don't fail, just continue without user
       req.user = null;

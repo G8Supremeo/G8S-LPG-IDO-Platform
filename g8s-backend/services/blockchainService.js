@@ -1,8 +1,12 @@
 const { ethers } = require('ethers');
-const Token = require('../models/Token');
-const Transaction = require('../models/Transaction');
-const User = require('../models/User');
-const Notification = require('../models/Notification');
+const USE_MONGO = (process.env.USE_MONGO || '').toLowerCase() === 'true';
+let Token, Transaction, User, Notification;
+if (USE_MONGO) {
+  Token = require('../models/Token');
+  Transaction = require('../models/Transaction');
+  User = require('../models/User');
+  Notification = require('../models/Notification');
+}
 
 class BlockchainService {
   constructor() {
@@ -181,12 +185,11 @@ class BlockchainService {
     try {
       console.log('G8S Token Transfer:', { from, to, amount: amount.toString() });
       
-      // Update token statistics
-      await this.updateTokenStatistics('g8s', event);
-      
-      // Create notification if it's a user transaction
-      if (from !== ethers.ZeroAddress && to !== ethers.ZeroAddress) {
-        await this.createTransferNotification(from, to, amount, 'G8S');
+      if (USE_MONGO) {
+        await this.updateTokenStatistics('g8s', event);
+        if (from !== ethers.ZeroAddress && to !== ethers.ZeroAddress) {
+          await this.createTransferNotification(from, to, amount, 'G8S');
+        }
       }
     } catch (error) {
       console.error('Error handling token transfer:', error);
@@ -197,6 +200,21 @@ class BlockchainService {
     try {
       console.log('Tokens Purchased:', { buyer, amount: amount.toString(), cost: cost.toString() });
       
+      if (!USE_MONGO) {
+        if (global.broadcast) {
+          global.broadcast({
+            type: 'investment_update',
+            data: {
+              user: buyer,
+              amount: parseFloat(ethers.formatEther(amount)),
+              cost: parseFloat(ethers.formatEther(cost)),
+              timestamp: new Date()
+            }
+          });
+        }
+        return;
+      }
+
       // Find user by wallet address
       const user = await User.findOne({ walletAddress: buyer.toLowerCase() });
       
@@ -279,13 +297,14 @@ class BlockchainService {
     try {
       console.log('Sale Paused:', event);
       
-      // Create system notification
-      await this.createSystemNotification(
-        'IDO Sale Paused',
-        'The G8S IDO sale has been temporarily paused. Please check back later.',
-        'system',
-        'warning'
-      );
+      if (USE_MONGO) {
+        await this.createSystemNotification(
+          'IDO Sale Paused',
+          'The G8S IDO sale has been temporarily paused. Please check back later.',
+          'system',
+          'warning'
+        );
+      }
 
       // Broadcast real-time update
       if (global.broadcast) {
@@ -306,13 +325,14 @@ class BlockchainService {
     try {
       console.log('Sale Resumed:', event);
       
-      // Create system notification
-      await this.createSystemNotification(
-        'IDO Sale Resumed',
-        'The G8S IDO sale has been resumed. You can now invest in G8S tokens.',
-        'system',
-        'success'
-      );
+      if (USE_MONGO) {
+        await this.createSystemNotification(
+          'IDO Sale Resumed',
+          'The G8S IDO sale has been resumed. You can now invest in G8S tokens.',
+          'system',
+          'success'
+        );
+      }
 
       // Broadcast real-time update
       if (global.broadcast) {
@@ -333,16 +353,15 @@ class BlockchainService {
     try {
       console.log('Price Updated:', { newPrice: newPrice.toString() });
       
-      // Update token price
-      await this.updateTokenPrice('g8s', parseFloat(ethers.formatEther(newPrice)));
-      
-      // Create system notification
-      await this.createSystemNotification(
-        'Token Price Updated',
-        `The G8S token price has been updated to ${ethers.formatEther(newPrice)} PUSD per token`,
-        'system',
-        'info'
-      );
+      if (USE_MONGO) {
+        await this.updateTokenPrice('g8s', parseFloat(ethers.formatEther(newPrice)));
+        await this.createSystemNotification(
+          'Token Price Updated',
+          `The G8S token price has been updated to ${ethers.formatEther(newPrice)} PUSD per token`,
+          'system',
+          'info'
+        );
+      }
 
       // Broadcast real-time update
       if (global.broadcast) {
@@ -364,13 +383,14 @@ class BlockchainService {
     try {
       console.log('Funds Withdrawn:', { amount: amount.toString() });
       
-      // Create system notification
-      await this.createSystemNotification(
-        'Funds Withdrawn',
-        `${ethers.formatEther(amount)} PUSD has been withdrawn from the IDO contract`,
-        'system',
-        'info'
-      );
+      if (USE_MONGO) {
+        await this.createSystemNotification(
+          'Funds Withdrawn',
+          `${ethers.formatEther(amount)} PUSD has been withdrawn from the IDO contract`,
+          'system',
+          'info'
+        );
+      }
     } catch (error) {
       console.error('Error handling funds withdrawn:', error);
     }
@@ -380,8 +400,9 @@ class BlockchainService {
     try {
       console.log('PUSD Transfer:', { from, to, amount: amount.toString() });
       
-      // Update token statistics
-      await this.updateTokenStatistics('pusd', event);
+      if (USE_MONGO) {
+        await this.updateTokenStatistics('pusd', event);
+      }
     } catch (error) {
       console.error('Error handling PUSD transfer:', error);
     }
@@ -398,8 +419,10 @@ class BlockchainService {
         btc: 45000  // $45000 per BTC
       };
 
-      for (const [symbol, price] of Object.entries(mockPrices)) {
-        await this.updateTokenPrice(symbol, price);
+      if (USE_MONGO) {
+        for (const [symbol, price] of Object.entries(mockPrices)) {
+          await this.updateTokenPrice(symbol, price);
+        }
       }
 
       console.log('Token prices updated');
@@ -410,6 +433,7 @@ class BlockchainService {
 
   async updateTokenPrice(symbol, priceUSD) {
     try {
+      if (!USE_MONGO) return;
       const token = await Token.findOne({ symbol: symbol.toUpperCase() });
       if (token) {
         token.price.usd = priceUSD;
@@ -424,6 +448,7 @@ class BlockchainService {
 
   async updateTokenStatistics(symbol, event) {
     try {
+      if (!USE_MONGO) return;
       const token = await Token.findOne({ symbol: symbol.toUpperCase() });
       if (token) {
         token.statistics.transactions += 1;
@@ -437,6 +462,7 @@ class BlockchainService {
 
   async processPendingTransactions() {
     try {
+      if (!USE_MONGO) return;
       const pendingTransactions = await Transaction.getPendingTransactions();
       
       for (const transaction of pendingTransactions) {
@@ -517,6 +543,7 @@ class BlockchainService {
 
   async createTransferNotification(from, to, amount, tokenSymbol) {
     try {
+      if (!USE_MONGO) return;
       const user = await User.findOne({ walletAddress: to.toLowerCase() });
       if (user) {
         await Notification.createNotification({
@@ -538,6 +565,7 @@ class BlockchainService {
 
   async createSystemNotification(title, message, type, category) {
     try {
+      if (!USE_MONGO) return;
       // Get all active users
       const users = await User.find({ accountStatus: 'active' });
       
