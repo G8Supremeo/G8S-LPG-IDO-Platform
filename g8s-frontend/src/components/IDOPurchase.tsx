@@ -35,6 +35,8 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [approvalHash, setApprovalHash] = useState<`0x${string}` | undefined>();
+  const [purchaseHash, setPurchaseHash] = useState<`0x${string}` | undefined>();
 
   // Contract reads
   const { data: pusdBalance } = useBalance({
@@ -74,16 +76,15 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   });
 
   // Contract writes
-  const { writeContract: writePUSD } = useWriteContract();
-  const { writeContract: writeIDO } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
 
   // Transaction receipts
-  const { isLoading: isApprovalPending } = useWaitForTransactionReceipt({
-    hash: undefined, // Will be set when approval transaction is submitted
+  const { isLoading: isApprovalPending, isSuccess: isApprovalSuccess } = useWaitForTransactionReceipt({
+    hash: approvalHash,
   });
 
-  const { isLoading: isPurchasePending } = useWaitForTransactionReceipt({
-    hash: undefined, // Will be set when purchase transaction is submitted
+  const { isLoading: isPurchasePending, isSuccess: isPurchaseSuccess } = useWaitForTransactionReceipt({
+    hash: purchaseHash,
   });
 
   // Calculate PUSD amount when token amount changes
@@ -118,15 +119,15 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
 
     try {
       const amount = parseEther(pusdAmount);
-      
-      await writePUSD({
+      const hash = await writeContractAsync({
         address: CONTRACTS.PUSD_ADDRESS as `0x${string}`,
         abi: ABI.ERC20,
         functionName: "approve",
         args: [CONTRACTS.IDO_ADDRESS as `0x${string}`, amount],
       });
 
-      setSuccess("Approval transaction submitted! Please wait for confirmation.");
+      setApprovalHash(hash);
+      setSuccess("Approval transaction sent. Confirming...");
     } catch (err: any) {
       setError(err.message || "Failed to approve PUSD tokens");
     } finally {
@@ -142,15 +143,15 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
 
     try {
       const amount = parseEther(pusdAmount);
-      
-      await writeIDO({
+      const hash = await writeContractAsync({
         address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
         abi: ABI.IDO,
         functionName: "buyWithPUSD",
         args: [amount],
       });
 
-      setSuccess("Purchase transaction submitted! Please wait for confirmation.");
+      setPurchaseHash(hash);
+      setSuccess("Purchase transaction sent. Confirming...");
       onPurchaseSuccess?.();
     } catch (err: any) {
       setError(err.message || "Failed to purchase tokens");
@@ -158,6 +159,19 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
       setIsPurchasing(false);
     }
   };
+
+  // Update messages post-confirmation
+  useEffect(() => {
+    if (isApprovalSuccess) {
+      setSuccess("Approval confirmed. You can now buy tokens.");
+    }
+  }, [isApprovalSuccess]);
+
+  useEffect(() => {
+    if (isPurchaseSuccess) {
+      setSuccess("Purchase confirmed. G8S tokens will reflect shortly.");
+    }
+  }, [isPurchaseSuccess]);
 
   const hasEnoughBalance = pusdBalance && pusdAmount 
     ? Number(formatUnits(pusdBalance.value, pusdBalance.decimals)) >= parseFloat(pusdAmount)
@@ -328,13 +342,13 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleApprove}
-                  disabled={isApproving || isPaused}
+                  disabled={isApproving || isApprovalPending || isPaused}
                   className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
                 >
-                  {isApproving ? (
+                  {isApproving || isApprovalPending ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>Approving...</span>
+                      <span>{isApprovalPending ? 'Waiting for confirmation...' : 'Approving...'}</span>
                     </>
                   ) : (
                     <>
@@ -349,13 +363,13 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 whileHover={{ scale: canPurchase ? 1.02 : 1 }}
                 whileTap={{ scale: canPurchase ? 0.98 : 1 }}
                 onClick={handlePurchase}
-                disabled={!canPurchase}
+                disabled={!canPurchase || isPurchasePending}
                 className="w-full px-6 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
               >
-                {isPurchasing ? (
+                {isPurchasing || isPurchasePending ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Purchasing...</span>
+                    <span>{isPurchasePending ? 'Waiting for confirmation...' : 'Purchasing...'}</span>
                   </>
                 ) : (
                   <>
