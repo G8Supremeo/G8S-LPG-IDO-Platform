@@ -1,21 +1,19 @@
+
 // supabase-config.js
 const { createClient } = require('@supabase/supabase-js');
 const dotenv = require('dotenv');
 dotenv.config();
 
 // --- Supabase configuration ---
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
+const SUPABASE_ANON_KEY = (process.env.SUPABASE_ANON_KEY || '').trim();
+const SUPABASE_SERVICE_KEY = (process.env.SUPABASE_SERVICE_KEY || '').trim();
 
 // Create Supabase clients (only if environment variables are available)
 let supabase = null;
 let supabaseAdmin = null;
 
-if (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_SERVICE_KEY) {
-  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-}
+// Deferred client initialization; see constructor below
 
 // Table constants
 const TABLES = {
@@ -44,8 +42,15 @@ class SupabaseService {
       return;
     }
 
-    this.client = supabase;
-    this.admin = supabaseAdmin;
+    // Initialize clients now (not at module import time)
+    try {
+      this.client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      this.admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    } catch (e) {
+      console.error('❌ Failed to initialize Supabase clients:', e.message);
+      this.client = null;
+      this.admin = null;
+    }
     this.tables = TABLES;
   }
 
