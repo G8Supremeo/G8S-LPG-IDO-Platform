@@ -97,6 +97,19 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     functionName: "endTime",
   });
 
+  // Resolve G8S token address and IDO G8S balance to prevent transfer failures
+  const { data: g8sAddress } = useReadContract({
+    address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
+    abi: ABI.IDO,
+    functionName: "g8sToken",
+  });
+
+  const { data: idoG8sBalance } = useBalance({
+    address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
+    token: (g8sAddress as `0x${string}`) || undefined,
+    query: { enabled: !!g8sAddress },
+  });
+
   // Contract writes
   const { writeContractAsync } = useWriteContract();
 
@@ -203,7 +216,8 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     }
   }, [isPurchaseSuccess]);
 
-  const decimalsNum = typeof pusdDecimals === 'number' ? pusdDecimals : 18;
+  const decimalsLoaded = typeof pusdDecimals === 'number';
+  const decimalsNum = decimalsLoaded ? (pusdDecimals as number) : 18;
 
   const hasEnoughBalance = pusdBalance && pusdAmount 
     ? Number(formatUnits(pusdBalance.value, pusdBalance.decimals)) >= parseFloat(pusdAmount)
@@ -219,12 +233,19 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
 
   // Pre-check cap based on entered PUSD
   let exceedsCap = false;
+  let exceedsIdoBalance = false;
   try {
     if (pusdAmount && idoPrice && tokensSold && tokensForSale) {
       const amountWei = parseUnits(pusdAmount, decimalsNum);
       const ONE = 1000000000000000000n;
       const tokensOut = (amountWei * ONE) / (idoPrice as bigint);
-      exceedsCap = (BigInt(tokensSold as unknown as number) + tokensOut) > (tokensForSale as bigint);
+      const sold = tokensSold as bigint;
+      const cap = tokensForSale as bigint;
+      exceedsCap = (sold + tokensOut) > cap;
+
+      if (idoG8sBalance && typeof idoG8sBalance.value === 'bigint') {
+        exceedsIdoBalance = tokensOut > (idoG8sBalance.value as bigint);
+      }
     }
   } catch (_) {
     // ignore precheck errors
@@ -236,6 +257,8 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     hasEnoughBalance && 
     hasEnoughAllowance && 
     saleActive &&
+    decimalsLoaded &&
+    !exceedsIdoBalance &&
     !exceedsCap &&
     !isApproving && 
     !isPurchasing;
