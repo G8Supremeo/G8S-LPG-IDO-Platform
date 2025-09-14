@@ -85,6 +85,18 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     functionName: "paused",
   });
 
+  const { data: saleStart } = useReadContract({
+    address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
+    abi: ABI.IDO,
+    functionName: "startTime",
+  });
+
+  const { data: saleEnd } = useReadContract({
+    address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
+    abi: ABI.IDO,
+    functionName: "endTime",
+  });
+
   // Contract writes
   const { writeContractAsync } = useWriteContract();
 
@@ -191,20 +203,40 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     }
   }, [isPurchaseSuccess]);
 
+  const decimalsNum = typeof pusdDecimals === 'number' ? pusdDecimals : 18;
+
   const hasEnoughBalance = pusdBalance && pusdAmount 
     ? Number(formatUnits(pusdBalance.value, pusdBalance.decimals)) >= parseFloat(pusdAmount)
     : false;
 
   const hasEnoughAllowance = pusdAllowance && pusdAmount
-    ? Number(formatEther(pusdAllowance)) >= parseFloat(pusdAmount)
+    ? Number(formatUnits(pusdAllowance as bigint, decimalsNum)) >= parseFloat(pusdAmount)
     : false;
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const withinWindow = saleStart && saleEnd ? (Number(saleStart) <= nowSec && nowSec <= Number(saleEnd)) : true;
+  const saleActive = !isPaused && withinWindow;
+
+  // Pre-check cap based on entered PUSD
+  let exceedsCap = false;
+  try {
+    if (pusdAmount && idoPrice && tokensSold && tokensForSale) {
+      const amountWei = parseUnits(pusdAmount, decimalsNum);
+      const ONE = 1000000000000000000n;
+      const tokensOut = (amountWei * ONE) / (idoPrice as bigint);
+      exceedsCap = (BigInt(tokensSold as unknown as number) + tokensOut) > (tokensForSale as bigint);
+    }
+  } catch (_) {
+    // ignore precheck errors
+  }
 
   const canPurchase = isConnected && 
     pusdAmount && 
     tokenAmount && 
     hasEnoughBalance && 
     hasEnoughAllowance && 
-    !isPaused &&
+    saleActive &&
+    !exceedsCap &&
     !isApproving && 
     !isPurchasing;
 
@@ -406,9 +438,15 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               </p>
             )}
 
-            {isPaused && (
+            {!saleActive && (
               <p className="text-yellow-400 text-sm text-center">
-                Sale is currently paused
+                Sale is not active (paused or outside start/end time)
+              </p>
+            )}
+
+            {exceedsCap && (
+              <p className="text-red-400 text-sm text-center">
+                Purchase exceeds remaining IDO allocation
               </p>
             )}
           </div>
