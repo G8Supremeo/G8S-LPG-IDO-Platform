@@ -17,7 +17,10 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "seed": "node scripts/seed.js",
-    "migrate": "node scripts/migrate.js"
+    "migrate": "node scripts/migrate.js",
+    "setup": "node quick-setup.js",
+    "check-env": "node startup-check.js",
+    "test-startup": "node test-startup.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

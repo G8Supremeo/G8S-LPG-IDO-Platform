@@ -50,27 +50,54 @@ class BlockchainService {
   async loadContracts() {
     try {
       // Load G8S Token contract (case-sensitive on Linux)
-      const g8sTokenABI = require('../contracts/abi/g8sToken.json');
       const g8sTokenAddress = process.env.G8S_TOKEN_ADDRESS;
       
       if (g8sTokenAddress) {
-        this.contracts.g8sToken = new ethers.Contract(
-          g8sTokenAddress,
-          g8sTokenABI,
-          this.wallet
-        );
+        try {
+          const g8sTokenABI = require('../contracts/abi/g8sToken.json');
+          this.contracts.g8sToken = new ethers.Contract(
+            g8sTokenAddress,
+            g8sTokenABI,
+            this.wallet
+          );
+          console.log('✅ G8S Token contract loaded');
+        } catch (error) {
+          console.warn('⚠️ G8S Token ABI not found, using minimal ERC20 ABI');
+          const minimalERC20ABI = [
+            'function balanceOf(address owner) view returns (uint256)',
+            'function transfer(address to, uint256 amount) returns (bool)',
+            'function approve(address spender, uint256 amount) returns (bool)',
+            'function allowance(address owner, address spender) view returns (uint256)',
+            'function decimals() view returns (uint8)',
+            'function name() view returns (string)',
+            'function symbol() view returns (string)',
+            'function totalSupply() view returns (uint256)',
+            'event Transfer(address indexed from, address indexed to, uint256 value)',
+            'event Approval(address indexed owner, address indexed spender, uint256 value)'
+          ];
+          this.contracts.g8sToken = new ethers.Contract(
+            g8sTokenAddress,
+            minimalERC20ABI,
+            this.wallet
+          );
+        }
       }
 
       // Load G8S IDO contract (case-sensitive on Linux)
-      const g8sIdoABI = require('../contracts/abi/g8sIdo.json');
-      const g8sIdoAddress = process.env.G8S_IDO_ADDRESS;
+      const g8sIdoAddress = process.env.IDO_ADDRESS || process.env.G8S_IDO_ADDRESS;
       
       if (g8sIdoAddress) {
-        this.contracts.g8sIdo = new ethers.Contract(
-          g8sIdoAddress,
-          g8sIdoABI,
-          this.wallet
-        );
+        try {
+          const g8sIdoABI = require('../contracts/abi/g8sIdo.json');
+          this.contracts.g8sIdo = new ethers.Contract(
+            g8sIdoAddress,
+            g8sIdoABI,
+            this.wallet
+          );
+          console.log('✅ G8S IDO contract loaded');
+        } catch (error) {
+          console.warn('⚠️ G8S IDO ABI not found, skipping IDO contract');
+        }
       }
 
       // Load PUSD contract

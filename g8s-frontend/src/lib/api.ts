@@ -1,5 +1,6 @@
 // API service for connecting to the G8S LPG backend
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://g8s-lpg-api.up.railway.app';
+//'http://localhost:5000/api';
 
 class ApiService {
   private baseURL: string;

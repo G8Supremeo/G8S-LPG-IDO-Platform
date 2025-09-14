@@ -10,6 +10,7 @@ const cron = require('node-cron');
 const WebSocket = require('ws');
 const http = require('http');
 const { SupabaseService } = require('./supabase-config');
+const { checkEnvironmentVariables } = require('./startup-check');
 
 // Load environment variables
 dotenv.config();
@@ -90,13 +91,29 @@ app.use('/api/', limiter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({
+  const health = {
     status: 'OK',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
     version: process.env.npm_package_version || '1.0.0',
-    database: 'Supabase'
+    database: 'Supabase',
+    services: {
+      supabase: supabaseService && supabaseService.client ? 'connected' : 'not_configured',
+      blockchain: 'read-only',
+      websocket: 'active'
+    }
+  };
+  
+  res.json(health);
+});
+
+// Simple status endpoint for Railway health checks
+app.get('/', (req, res) => {
+  res.json({
+    message: 'G8S LPG Backend API',
+    status: 'running',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -184,7 +201,15 @@ const initializeServices = async () => {
 
 // Start the application
 const startApp = async () => {
-  console.log('🚀 Starting G8S LPG Backend with Supabase...');
+  console.log('🚀 Starting G8S LPG Backend with Supabase...\n');
+  
+  // Check environment variables first
+  const envCheck = checkEnvironmentVariables();
+  if (!envCheck) {
+    console.log('❌ Environment check failed. Please set required environment variables.');
+    console.log('📝 See RAILWAY_ENV_SETUP.md for setup instructions.');
+    process.exit(1);
+  }
   
   // Test Supabase connection
   if (supabaseService && supabaseService.client) {

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
+import IDOPurchase from "@/components/IDOPurchase";
 
 export default function IDOSale() {
   const [isSaleActive, setIsSaleActive] = useState(true);
@@ -305,11 +306,21 @@ export default function IDOSale() {
           </div>
         </motion.div>
 
-        {/* CTA Section */}
+        {/* Purchase Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.8 }}
+          className="mb-8"
+        >
+          <IDOPurchase />
+        </motion.div>
+
+        {/* CTA Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.9 }}
           className="text-center bg-white/10 backdrop-blur-sm rounded-3xl p-12 border border-white/20"
         >
           <h2 className="text-4xl font-bold text-white mb-6">Ready to Invest?</h2>
@@ -318,15 +329,6 @@ export default function IDOSale() {
             Secure your G8S tokens today and be part of the future.
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-10 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
-            >
-              <Zap className="w-5 h-5" />
-              <span>Buy G8S Tokens</span>
-              <ArrowRight className="w-4 h-4" />
-            </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
