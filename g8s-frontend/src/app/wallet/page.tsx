@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBlockNumber } from "wagmi";
 import { formatUnits, parseUnits } from "viem";
 import {
-  Wallet,
+  Wallet as WalletIcon,
   Send,
   Download,
   Upload,
@@ -45,6 +45,15 @@ export default function Wallet() {
   const pusd = useContractAddress(CONTRACTS.PUSD_ADDRESS);
   const g8s = useContractAddress(CONTRACTS.G8S_TOKEN_ADDRESS);
 
+  // USD to NGN conversion rate (approximate)
+  const USD_TO_NGN = 1500; // 1 USD ≈ 1500 NGN
+
+  // Utility function to convert USD to NGN
+  const convertToNGN = (usdValue: string) => {
+    const numericValue = parseFloat(usdValue.replace('$', '').replace(',', ''));
+    return `₦${(numericValue * USD_TO_NGN).toLocaleString()}`;
+  };
+
   // Read real wallet balances
   const { data: g8sBalance } = useReadContract({
     abi: ABI.G8S,
@@ -60,6 +69,13 @@ export default function Wallet() {
     functionName: "balanceOf",
     args: address ? [address] : undefined,
     query: { enabled: Boolean(address && pusd) }
+  });
+
+  const { data: pusdDecimals } = useReadContract({
+    abi: ABI.ERC20,
+    address: pusd,
+    functionName: "decimals",
+    query: { enabled: Boolean(pusd) }
   });
 
   const { writeContract, data: txHash } = useWriteContract();
@@ -88,15 +104,15 @@ export default function Wallet() {
     {
       token: "PUSD",
       symbol: "PUSD",
-      balance: pusdBalance ? formatUnits(pusdBalance as bigint, 18) : "0",
-      value: pusdBalance ? `$${formatUnits(pusdBalance as bigint, 18)}` : "$0.00",
-      ngnValue: pusdBalance ? convertToNGN(`$${formatUnits(pusdBalance as bigint, 18)}`) : "₦0",
+      balance: pusdBalance ? formatUnits(pusdBalance as bigint, typeof pusdDecimals === 'number' ? pusdDecimals : 0) : "0",
+      value: pusdBalance ? `$${formatUnits(pusdBalance as bigint, typeof pusdDecimals === 'number' ? pusdDecimals : 0)}` : "$0.00",
+      ngnValue: pusdBalance ? convertToNGN(`$${formatUnits(pusdBalance as bigint, typeof pusdDecimals === 'number' ? pusdDecimals : 0)}`) : "₦0",
       change: "0%",
       changeType: "neutral",
       icon: DollarSign,
       color: "from-green-500 to-emerald-500",
       contractAddress: pusd,
-      decimals: 18
+      decimals: typeof pusdDecimals === 'number' ? pusdDecimals : 0
     }
   ];
 
@@ -108,15 +124,6 @@ export default function Wallet() {
 
   // Calculate total G8S holdings
   const totalG8SHoldings = g8sBalance ? formatUnits(g8sBalance as bigint, 18) : "0";
-
-  // USD to NGN conversion rate (approximate)
-  const USD_TO_NGN = 1500; // 1 USD ≈ 1500 NGN
-
-  // Utility function to convert USD to NGN
-  const convertToNGN = (usdValue: string) => {
-    const numericValue = parseFloat(usdValue.replace('$', '').replace(',', ''));
-    return `₦${(numericValue * USD_TO_NGN).toLocaleString()}`;
-  };
 
   // Function to fetch real transactions
   const fetchRealTransactions = async () => {
@@ -275,7 +282,8 @@ export default function Wallet() {
   const handleSend = () => {
     if (!sendAmount || !sendAddress || !address) return;
     
-    const amount = parseUnits(sendAmount, 18);
+    const decimals = sendToken === "G8S" ? 18 : (typeof pusdDecimals === 'number' ? pusdDecimals : 0);
+    const amount = parseUnits(sendAmount, decimals);
     const tokenAddress = sendToken === "G8S" ? g8s : pusd;
     const tokenABI = sendToken === "G8S" ? ABI.G8S : ABI.ERC20;
     
@@ -309,7 +317,7 @@ export default function Wallet() {
               className="text-center max-w-2xl mx-auto py-20"
             >
               <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-8">
-                <Wallet className="w-12 h-12 text-white" />
+                <WalletIcon className="w-12 h-12 text-white" />
               </div>
               
               <h1 className="text-4xl font-bold text-white mb-6">
@@ -526,7 +534,7 @@ export default function Wallet() {
                   {/* Wallet Info */}
                   <div className="mt-6 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
                     <div className="flex items-center space-x-2 mb-2">
-                      <Wallet className="w-5 h-5 text-blue-400" />
+                      <WalletIcon className="w-5 h-5 text-blue-400" />
                       <span className="text-blue-400 font-semibold">Wallet Information</span>
                     </div>
                     <div className="text-sm text-gray-300 space-y-1">
@@ -538,7 +546,7 @@ export default function Wallet() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <WalletIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-400">Connect your wallet to view token balances</p>
                 </div>
               )}
@@ -642,7 +650,7 @@ export default function Wallet() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <WalletIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-400">Connect your wallet to view transactions</p>
               </div>
             )}
@@ -726,7 +734,7 @@ export default function Wallet() {
               <div className="w-64 h-64 bg-white/5 rounded-2xl mx-auto mb-6 flex items-center justify-center">
                 <div className="text-center">
                   <div className="w-32 h-32 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl mx-auto mb-4 flex items-center justify-center">
-                    <Wallet className="w-16 h-16 text-white" />
+                    <WalletIcon className="w-16 h-16 text-white" />
                   </div>
                   <p className="text-gray-400">QR Code</p>
                 </div>
