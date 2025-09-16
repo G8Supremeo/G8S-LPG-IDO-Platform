@@ -96,7 +96,7 @@ export default function RealTimeStats() {
   // Calculate real-time statistics
   const stats = useMemo(() => {
     try {
-      const decimalsNum = typeof pusdDecimals === "number" ? (pusdDecimals as number) : 0;
+      const decimalsNum = typeof pusdDecimals === "number" ? (pusdDecimals as number) : 18;
       const priceValue = typeof price === "bigint" ? parseFloat(formatUnits(price as bigint, decimalsNum)) : 0;
       const tokensForSaleValue = typeof tokensForSale === "bigint" ? parseFloat(formatUnits(tokensForSale as bigint, 18)) : 0;
       const tokensSoldValue = typeof tokensSold === "bigint" ? parseFloat(formatUnits(tokensSold as bigint, 18)) : 0;

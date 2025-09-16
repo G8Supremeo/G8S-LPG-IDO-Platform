@@ -151,7 +151,7 @@ export default function SignInPage() {
           {/* Sign Up Link */}
           <div className="text-center mt-6">
             <p className="text-gray-300">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link href="/signup" className="text-blue-400 hover:text-blue-300 font-medium">
                 Sign up
               </Link>

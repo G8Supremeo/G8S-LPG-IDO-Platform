@@ -246,7 +246,7 @@ export default function EnhancedBusinessPlan() {
             Overview & Business Plan
           </h2>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-            Complete overview of the global LPG market, our business strategy, and comprehensive plan 
+              Complete overview of the global LPG market, our business strategy, and comprehensive plan 
             to revolutionize clean energy investments through blockchain technology.
           </p>
         </motion.div>
@@ -719,7 +719,7 @@ export default function EnhancedBusinessPlan() {
           <div className="max-w-4xl mx-auto">
             <h3 className="text-4xl font-bold text-white mb-6">Join the Clean Energy Revolution</h3>
             <p className="text-xl text-gray-300 mb-8">
-              Be part of the transformation that's making clean energy accessible to everyone, 
+              Be part of the transformation that&apos;s making clean energy accessible to everyone, 
               everywhere. Invest in the future of sustainable energy today.
             </p>
             <div className="flex flex-col sm:flex-row gap-6 justify-center">

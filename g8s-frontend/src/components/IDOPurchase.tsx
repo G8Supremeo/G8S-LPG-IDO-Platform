@@ -37,6 +37,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   const [pusdAmount, setPusdAmount] = useState("");
   const [isApproving, setIsApproving] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [waitingForApproval, setWaitingForApproval] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [approvalHash, setApprovalHash] = useState<`0x${string}` | undefined>();
@@ -122,14 +123,40 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     hash: purchaseHash,
   });
 
+  // Helpers: sanitize number input and format token amounts for display
+  const sanitizeNumberInput = (value: string, maxWhole = 12, maxDecimals = 6) => {
+  // Allow only digits and a single decimal point
+  const v = value.replace(/[^0-9.]/g, "");
+    const parts = v.split('.');
+    if (parts.length > 2) parts.splice(2); // keep only one dot
+    const whole = parts[0].slice(0, maxWhole);
+    const frac = parts[1] ? parts[1].slice(0, maxDecimals) : undefined;
+    return frac !== undefined ? `${whole}.${frac}` : whole;
+  };
+
+  const formatTokenAmountString = (weiValue: bigint | 0n) => {
+    if (!weiValue || weiValue === 0n) return '0';
+    try {
+      // formatUnits returns a decimal string with token decimals (G8S uses 18)
+      const s = formatUnits(weiValue, 18);
+      if (!s.includes('.')) return Number(s).toLocaleString();
+      const [intPart, fracPart] = s.split('.');
+      const trimmedFrac = fracPart.replace(/0+$/, '').slice(0, 6); // max 6 decimals
+      const intFormatted = Number(intPart).toLocaleString();
+      return trimmedFrac ? `${intFormatted}.${trimmedFrac}` : intFormatted;
+    } catch {
+      return '0';
+    }
+  };
+
   // Calculate PUSD amount when token amount changes
   useEffect(() => {
     if (tokenAmount && idoPrice) {
-      const tokens = parseFloat(tokenAmount);
-      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 0;
+      const tokens = parseFloat(tokenAmount || '0');
+      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 18;
       const price = Number(formatUnits(idoPrice as bigint, decimals));
       const pusd = tokens * price;
-      setPusdAmount(pusd.toFixed(6));
+      setPusdAmount(pusd.toFixed(Math.min(6, decimals)));
     } else {
       setPusdAmount("");
     }
@@ -138,10 +165,10 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   // Calculate token amount when PUSD amount changes
   useEffect(() => {
     if (pusdAmount && idoPrice) {
-      const pusd = parseFloat(pusdAmount);
-      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 0;
+      const pusd = parseFloat(pusdAmount || '0');
+      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 18;
       const price = Number(formatUnits(idoPrice as bigint, decimals));
-      const tokens = pusd / price;
+      const tokens = price > 0 ? pusd / price : 0;
       setTokenAmount(tokens.toFixed(2));
     } else {
       setTokenAmount("");
@@ -152,6 +179,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     if (!address || !pusdAmount) return;
 
     setIsApproving(true);
+    setWaitingForApproval(true);
     setError("");
 
     try {
@@ -169,8 +197,10 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
 
       setApprovalHash(hash);
       setSuccess("Approval transaction sent. Confirming...");
-    } catch (err: any) {
-      setError(err.message || "Failed to approve PUSD tokens");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to approve PUSD tokens';
+      setError(message);
+      setWaitingForApproval(false);
     } finally {
       setIsApproving(false);
     }
@@ -201,8 +231,9 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
       setPurchaseHash(hash);
       setSuccess("Purchase transaction sent. Confirming...");
       onPurchaseSuccess?.();
-    } catch (err: any) {
-      setError(err.message || "Failed to purchase tokens");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to purchase tokens';
+      setError(message);
     } finally {
       setIsPurchasing(false);
     }
@@ -212,6 +243,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   useEffect(() => {
     if (isApprovalSuccess) {
       setSuccess("Approval confirmed. You can now buy tokens.");
+      setWaitingForApproval(false);
     }
   }, [isApprovalSuccess]);
 
@@ -222,7 +254,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   }, [isPurchaseSuccess]);
 
   const decimalsLoaded = typeof pusdDecimals === 'number';
-  const decimalsNum = decimalsLoaded ? (pusdDecimals as number) : 0;
+  const decimalsNum = decimalsLoaded ? (pusdDecimals as number) : 18;
 
   // Derived pricing and tokens-out for display (human-friendly)
   const priceNum = typeof idoPrice === 'bigint' ? Number(formatUnits(idoPrice as bigint, decimalsNum)) : undefined;
@@ -234,15 +266,29 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
       computedTokensOutWei = (amount * ONE) / (idoPrice as bigint);
     }
   } catch {}
-  const computedTokensOutHuman = Number(
-    computedTokensOutWei ? formatEther(computedTokensOutWei) : '0'
-  ).toLocaleString(undefined, { maximumFractionDigits: 6 });
+
+  // For display, prefer a decimal float computed from numeric price to avoid showing raw wei integers
+  const computedTokensOutHuman = (() => {
+    if (!pusdAmount) return '0';
+    const pusdNum = parseFloat(pusdAmount || '0');
+    if (priceNum && priceNum > 0) {
+      const tokensFloat = pusdNum / priceNum;
+      // limit to 6 decimals and trim trailing zeros
+      const fixed = tokensFloat.toFixed(6).replace(/(?:\.0+|(?<=\.[0-9]*?)0+)$/, '');
+      // add thousands separators for the integer part
+      const [intPart, fracPart] = fixed.split('.');
+      const intFormatted = Number(intPart).toLocaleString();
+      return fracPart ? `${intFormatted}.${fracPart}` : intFormatted;
+    }
+    // fallback to wei formatting if priceNum not available
+    return computedTokensOutWei ? formatTokenAmountString(computedTokensOutWei) : '0';
+  })();
 
   const hasEnoughBalance = pusdBalance && pusdAmount 
     ? Number(formatUnits(pusdBalance.value, pusdBalance.decimals)) >= parseFloat(pusdAmount)
     : false;
 
-  const hasEnoughAllowance = pusdAllowance && pusdAmount
+  const hasEnoughAllowance = !waitingForApproval && pusdAllowance && pusdAmount
     ? Number(formatUnits(pusdAllowance as bigint, decimalsNum)) >= parseFloat(pusdAmount)
     : false;
 
@@ -281,7 +327,9 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     !exceedsIdoBalance &&
     !exceedsCap &&
     !isApproving && 
-    !isPurchasing;
+    !isPurchasing &&
+    !isApprovalPending &&
+    !waitingForApproval;
 
   const progressPercentage = tokensSold && tokensForSale
     ? (Number(tokensSold) / Number(tokensForSale)) * 100
@@ -376,15 +424,14 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 Amount of G8S Tokens
               </label>
               <input
-                type="number"
+                type="text"
                 value={tokenAmount}
-                onChange={(e) => setTokenAmount(e.target.value)}
+                onChange={(e) => setTokenAmount(sanitizeNumberInput(e.target.value, 8, 4))}
                 placeholder="Enter amount"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
-                min={0}
-                step={0.01}
                 inputMode="decimal"
                 disabled={pausedBool}
+                maxLength={13}
               />
             </div>
 
@@ -393,15 +440,14 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 PUSD Amount
               </label>
               <input
-                type="number"
+                type="text"
                 value={pusdAmount}
-                onChange={(e) => setPusdAmount(e.target.value)}
+                onChange={(e) => setPusdAmount(sanitizeNumberInput(e.target.value, 10, decimalsNum === 0 ? 0 : 6))}
                 placeholder="Enter PUSD amount"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
-                min={0}
-                step={decimalsNum === 0 ? 1 : 0.000001}
                 inputMode="numeric"
                 disabled={pausedBool}
+                maxLength={16}
               />
             </div>
 

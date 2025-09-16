@@ -47,7 +47,7 @@ export default function IDOSale() {
     },
     {
       label: "Price per Token",
-      value: "₦666.67",
+      value: "2333",
       unit: "PUSD",
       description: "Fixed price during IDO"
     },
@@ -64,17 +64,17 @@ export default function IDOSale() {
       phase: "Phase 1",
       title: "Early Bird",
       status: "completed",
-      discount: "25%",
-      price: "₦500 PUSD",
+      discount: "6%",
+      price: "2200 PUSD",
       allocation: "50M G8S",
-      description: "Exclusive early access with maximum discount"
+      description: "Exclusive early access with discount"
     },
     {
       phase: "Phase 2",
       title: "Public Sale",
       status: "active",
       discount: "0%",
-      price: "₦666.67 PUSD",
+      price: "2333 PUSD",
       allocation: "200M G8S",
       description: "Open to all investors at standard price"
     },
@@ -83,7 +83,7 @@ export default function IDOSale() {
       title: "Final Round",
       status: "upcoming",
       discount: "0%",
-      price: "₦666.67 PUSD",
+      price: "2333 PUSD",
       allocation: "50M G8S",
       description: "Final opportunity to participate"
     }

@@ -9,7 +9,7 @@ interface ApiState<T> {
 
 interface UseApiOptions {
   immediate?: boolean;
-  onSuccess?: (data: any) => void;
+  onSuccess?: (data: unknown) => void;
   onError?: (error: string) => void;
 }
 
@@ -34,7 +34,8 @@ export function useApi<T>(
       
       if (response.success) {
         setState({ data: response.data, loading: false, error: null });
-        onSuccess?.(response.data);
+        // Pass data to callback as unknown to avoid implicit any
+        onSuccess?.(response.data as unknown);
       } else {
         const errorMessage = response.error || 'An error occurred';
         setState({ data: null, loading: false, error: errorMessage });
@@ -43,7 +44,7 @@ export function useApi<T>(
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred';
       setState({ data: null, loading: false, error: errorMessage });
-      onError?.(errorMessage);
+  onError?.(errorMessage);
     }
   }, [apiCall, onSuccess, onError]);
 
@@ -62,7 +63,7 @@ export function useApi<T>(
 
 // Hook for user authentication
 export function useAuth() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<unknown | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -255,29 +256,31 @@ export function useTransactionByHash(hash: string) {
 
 // Custom hook for API operations with loading states
 export function useApiOperation<T>(
-  operation: (...args: any[]) => Promise<{ success: boolean; data: T; error?: string }>
+  // Accept operation with any parameters; callers provide correct arg types.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  operation: (...args: any[]) => Promise<{ success: boolean; data?: T; error?: string; message?: string }>
 ) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const execute = useCallback(async (...args: any[]) => {
+  const execute = useCallback(async (...args: unknown[]) => {
     setLoading(true);
     setError(null);
 
     try {
       const response = await operation(...args);
-      
+
       if (response.success) {
         setLoading(false);
         return { success: true, data: response.data };
       } else {
-        const errorMessage = response.error || 'Operation failed';
+        const errorMessage = response.error || response.message || 'Operation failed';
         setError(errorMessage);
         setLoading(false);
         return { success: false, error: errorMessage };
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Operation failed';
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Operation failed';
       setError(errorMessage);
       setLoading(false);
       return { success: false, error: errorMessage };
@@ -314,7 +317,7 @@ export function useWalletConnection() {
 
 // Hook for KYC submission
 export function useKYCSubmission() {
-  return useApiOperation((kycData: any) => apiService.submitKYC(kycData));
+  return useApiOperation((kycData: unknown) => apiService.submitKYC(kycData));
 }
 
 // Hook for investment creation
@@ -328,7 +331,7 @@ export function useInvestmentCreation() {
 
 // Hook for transaction confirmation
 export function useTransactionConfirmation() {
-  return useApiOperation((transactionId: string, transactionHash: string, receipt: any) =>
+  return useApiOperation((transactionId: string, transactionHash: string, receipt: unknown) =>
     apiService.confirmTransaction(transactionId, transactionHash, receipt)
   );
 }
@@ -346,7 +349,7 @@ export function useAdminOperations() {
   );
 
   const { execute: performIdoAction, loading: performingAction, error: actionError } = useApiOperation(
-    (action: string, value?: any) => apiService.performIdoAction(action, value)
+    (action: string, value?: unknown) => apiService.performIdoAction(action, value)
   );
 
   return {
@@ -373,7 +376,7 @@ export function useNotificationOperations() {
   );
 
   const { execute: updatePreferences, loading: updatingPrefs, error: prefsError } = useApiOperation(
-    (preferences: any) => apiService.updateNotificationPreferences(preferences)
+    (preferences: unknown) => apiService.updateNotificationPreferences(preferences)
   );
 
   return {

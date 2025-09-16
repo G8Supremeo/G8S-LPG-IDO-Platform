@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ComponentType } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBlockNumber } from "wagmi";
 import { formatUnits, parseUnits } from "viem";
 import {
@@ -83,7 +83,26 @@ export default function Wallet() {
   const { data: blockNumber } = useBlockNumber();
 
   // State for real transactions
-  const [realTransactions, setRealTransactions] = useState<any[]>([]);
+  interface RealTx {
+    hash: string;
+    type: 'receive' | 'send' | string;
+    token: string;
+    tokenName: string;
+    amount: string;
+    value: string;
+    ngnValue: string;
+    status: string;
+    time: string;
+    blockNumber: string | number;
+    gasUsed?: string;
+    gasPrice?: string;
+    icon: ComponentType<{ className?: string }>;
+    color: string;
+    tokenIcon: ComponentType<{ className?: string }>;
+    tokenColor: string;
+  }
+
+  const [realTransactions, setRealTransactions] = useState<RealTx[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
 
   // Real wallet balances from contracts
@@ -104,15 +123,15 @@ export default function Wallet() {
     {
       token: "PUSD",
       symbol: "PUSD",
-      balance: pusdBalance ? formatUnits(pusdBalance as bigint, typeof pusdDecimals === 'number' ? pusdDecimals : 0) : "0",
-      value: pusdBalance ? `$${formatUnits(pusdBalance as bigint, typeof pusdDecimals === 'number' ? pusdDecimals : 0)}` : "$0.00",
-      ngnValue: pusdBalance ? convertToNGN(`$${formatUnits(pusdBalance as bigint, typeof pusdDecimals === 'number' ? pusdDecimals : 0)}`) : "₦0",
+      balance: pusdBalance ? formatUnits(pusdBalance as bigint, typeof pusdDecimals === 'number' ? pusdDecimals : 18) : "0",
+      value: pusdBalance ? `$${formatUnits(pusdBalance as bigint, typeof pusdDecimals === 'number' ? pusdDecimals : 18)}` : "$0.00",
+      ngnValue: pusdBalance ? convertToNGN(`$${formatUnits(pusdBalance as bigint, typeof pusdDecimals === 'number' ? pusdDecimals : 18)}`) : "₦0",
       change: "0%",
       changeType: "neutral",
       icon: DollarSign,
       color: "from-green-500 to-emerald-500",
       contractAddress: pusd,
-      decimals: typeof pusdDecimals === 'number' ? pusdDecimals : 0
+      decimals: typeof pusdDecimals === 'number' ? pusdDecimals : 18
     }
   ];
 
@@ -140,49 +159,61 @@ export default function Wallet() {
       const data = await response.json();
       
       if (data.status === '1' && data.result) {
-        const transactions = data.result.map((tx: any) => {
-          const isIncoming = tx.to.toLowerCase() === address.toLowerCase();
-          const isTokenTransfer = tx.input && tx.input.startsWith('0xa9059cbb');
-          
+        const transactions = data.result.map((tx: unknown) => {
+          const t = tx as Record<string, unknown>;
+
+          const toAddr = typeof t.to === 'string' ? t.to : '';
+          const input = typeof t.input === 'string' ? t.input : '';
+          const hash = typeof t.hash === 'string' ? t.hash : '';
+          const valueStr = typeof t.value === 'string' ? t.value : '0';
+          const timeStamp = typeof t.timeStamp === 'string' ? t.timeStamp : '0';
+          const blockNum = typeof t.blockNumber === 'string' ? t.blockNumber : (typeof t.blockNumber === 'number' ? String(t.blockNumber) : '');
+          const gasUsed = typeof t.gasUsed === 'string' ? t.gasUsed : undefined;
+          const gasPrice = typeof t.gasPrice === 'string' ? t.gasPrice : undefined;
+          const isError = typeof t.isError === 'string' ? t.isError : '0';
+
+          const isIncoming = address && toAddr && address.toLowerCase() === toAddr.toLowerCase();
+          const isTokenTransfer = input && input.startsWith('0xa9059cbb');
+
           // Determine token type based on contract address
           let tokenSymbol = 'ETH';
           let tokenName = 'Ethereum';
-          let tokenIcon = DollarSign;
+          let tokenIcon: ComponentType<{ className?: string }> = DollarSign;
           let tokenColor = 'text-blue-400';
-          
-          if (tx.to.toLowerCase() === g8s?.toLowerCase()) {
+
+          if (toAddr && g8s && toAddr.toLowerCase() === String(g8s).toLowerCase()) {
             tokenSymbol = 'G8S';
             tokenName = 'G8S Token';
             tokenIcon = Flame;
             tokenColor = 'text-orange-400';
-          } else if (tx.to.toLowerCase() === pusd?.toLowerCase()) {
+          } else if (toAddr && pusd && toAddr.toLowerCase() === String(pusd).toLowerCase()) {
             tokenSymbol = 'PUSD';
             tokenName = 'PUSD Token';
             tokenIcon = DollarSign;
             tokenColor = 'text-green-400';
           }
-          
-          const usdValue = isTokenTransfer ? 'Token Transfer' : `$${(parseFloat(tx.value) / 1e18 * 2000).toFixed(2)}`;
+
+          const usdValue = isTokenTransfer ? 'Token Transfer' : `$${(parseFloat(valueStr) / 1e18 * 2000).toFixed(2)}`;
           const ngnValue = isTokenTransfer ? 'Token Transfer' : convertToNGN(usdValue);
-          
+
           return {
-            hash: tx.hash,
+            hash,
             type: isIncoming ? 'receive' : 'send',
             token: tokenSymbol,
-            tokenName: tokenName,
-            amount: isTokenTransfer ? 'Token Transfer' : `${(parseFloat(tx.value) / 1e18).toFixed(4)} ETH`,
+            tokenName,
+            amount: isTokenTransfer ? 'Token Transfer' : `${(parseFloat(valueStr) / 1e18).toFixed(4)} ETH`,
             value: usdValue,
-            ngnValue: ngnValue,
-            status: tx.isError === '0' ? 'completed' : 'failed',
-            time: new Date(parseInt(tx.timeStamp) * 1000).toLocaleString(),
-            blockNumber: tx.blockNumber,
-            gasUsed: tx.gasUsed,
-            gasPrice: tx.gasPrice,
+            ngnValue,
+            status: isError === '0' ? 'completed' : 'failed',
+            time: new Date(parseInt(timeStamp, 10) * 1000).toLocaleString(),
+            blockNumber: blockNum,
+            gasUsed,
+            gasPrice,
             icon: isIncoming ? Download : Send,
-            color: tx.isError === '0' ? (isIncoming ? 'text-green-400' : 'text-blue-400') : 'text-red-400',
-            tokenIcon: tokenIcon,
-            tokenColor: tokenColor
-          };
+            color: isError === '0' ? (isIncoming ? 'text-green-400' : 'text-blue-400') : 'text-red-400',
+            tokenIcon,
+            tokenColor
+          } as RealTx;
         });
         
         setRealTransactions(transactions);
@@ -282,7 +313,7 @@ export default function Wallet() {
   const handleSend = () => {
     if (!sendAmount || !sendAddress || !address) return;
     
-    const decimals = sendToken === "G8S" ? 18 : (typeof pusdDecimals === 'number' ? pusdDecimals : 0);
+    const decimals = sendToken === "G8S" ? 18 : (typeof pusdDecimals === 'number' ? pusdDecimals : 18);
     const amount = parseUnits(sendAmount, decimals);
     const tokenAddress = sendToken === "G8S" ? g8s : pusd;
     const tokenABI = sendToken === "G8S" ? ABI.G8S : ABI.ERC20;

@@ -26,7 +26,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
 }
 
 // Create config only once to prevent multiple initializations
-let config: any = null;
+let config: ReturnType<typeof getDefaultConfig> | null = null;
 
 const getConfig = () => {
   if (!config) {

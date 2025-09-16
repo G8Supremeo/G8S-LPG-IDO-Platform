@@ -51,7 +51,7 @@ class ApiService {
   }) {
     const response = await this.request<{
       success: boolean;
-      data: { user: any; token: string };
+      data: { user: unknown; token: string };
       message: string;
     }>('/auth/register', {
       method: 'POST',
@@ -68,7 +68,7 @@ class ApiService {
   async login(credentials: { email: string; password: string }) {
     const response = await this.request<{
       success: boolean;
-      data: { user: any; token: string };
+      data: { user: unknown; token: string };
     }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
@@ -84,14 +84,14 @@ class ApiService {
   async getCurrentUser() {
     return this.request<{
       success: boolean;
-      data: { user: any };
+      data: { user: unknown };
     }>('/auth/me');
   }
 
   async verifyEmail(token: string) {
     const response = await this.request<{
       success: boolean;
-      data: { user: any; token: string };
+      data: { user: unknown; token: string };
       message: string;
     }>('/auth/verify-email', {
       method: 'POST',
@@ -118,7 +118,7 @@ class ApiService {
   async resetPassword(token: string, password: string) {
     const response = await this.request<{
       success: boolean;
-      data: { user: any; token: string };
+      data: { user: unknown; token: string };
       message: string;
     }>('/auth/reset-password', {
       method: 'POST',
@@ -136,14 +136,14 @@ class ApiService {
   async getUserProfile() {
     return this.request<{
       success: boolean;
-      data: { user: any };
+      data: { user: unknown };
     }>('/users/profile');
   }
 
-  async updateUserProfile(profileData: any) {
+  async updateUserProfile(profileData: unknown) {
     return this.request<{
       success: boolean;
-      data: { user: any };
+      data: { user: unknown };
       message: string;
     }>('/users/profile', {
       method: 'PUT',
@@ -158,7 +158,7 @@ class ApiService {
   }) {
     return this.request<{
       success: boolean;
-      data: { user: any };
+      data: { user: unknown };
       message: string;
     }>('/users/connect-wallet', {
       method: 'POST',
@@ -169,17 +169,17 @@ class ApiService {
   async disconnectWallet() {
     return this.request<{
       success: boolean;
-      data: { user: any };
+      data: { user: unknown };
       message: string;
     }>('/users/disconnect-wallet', {
       method: 'POST',
     });
   }
 
-  async submitKYC(kycData: any) {
+  async submitKYC(kycData: unknown) {
     return this.request<{
       success: boolean;
-      data: { user: any };
+      data: { user: unknown };
       message: string;
     }>('/users/kyc', {
       method: 'POST',
@@ -190,14 +190,14 @@ class ApiService {
   async getUserTransactions(page: number = 1, limit: number = 20) {
     return this.request<{
       success: boolean;
-      data: { transactions: any[]; pagination: any };
+      data: { transactions: unknown[]; pagination: unknown };
     }>(`/users/transactions?page=${page}&limit=${limit}`);
   }
 
   async getUserStatistics() {
     return this.request<{
       success: boolean;
-      data: { user: any; transactions: any; notifications: any };
+      data: { user: unknown; transactions: unknown; notifications: unknown };
     }>('/users/statistics');
   }
 
@@ -211,14 +211,14 @@ class ApiService {
     
     return this.request<{
       success: boolean;
-      data: { tokens: any[]; pagination: any };
+      data: { tokens: unknown[]; pagination: unknown };
     }>(`/tokens?${params}`);
   }
 
   async getTokenByAddress(address: string) {
     return this.request<{
       success: boolean;
-      data: { token: any };
+      data: { token: unknown };
     }>(`/tokens/${address}`);
   }
 
@@ -232,14 +232,14 @@ class ApiService {
   async getIdoTokens() {
     return this.request<{
       success: boolean;
-      data: { tokens: any[] };
+      data: { tokens: unknown[] };
     }>('/tokens/ido/list');
   }
 
   async getTokenStatistics() {
     return this.request<{
       success: boolean;
-      data: { statistics: any };
+      data: { statistics: unknown };
     }>('/tokens/statistics');
   }
 
@@ -251,7 +251,7 @@ class ApiService {
   }) {
     return this.request<{
       success: boolean;
-      data: { transaction: any };
+      data: { transaction: unknown };
       message: string;
     }>('/transactions/invest', {
       method: 'POST',
@@ -259,10 +259,10 @@ class ApiService {
     });
   }
 
-  async confirmTransaction(transactionId: string, transactionHash: string, receipt: any) {
+  async confirmTransaction(transactionId: string, transactionHash: string, receipt: unknown) {
     return this.request<{
       success: boolean;
-      data: { transaction: any };
+      data: { transaction: unknown };
       message: string;
     }>(`/transactions/${transactionId}/confirm`, {
       method: 'POST',
@@ -273,14 +273,14 @@ class ApiService {
   async getTransactionByHash(hash: string) {
     return this.request<{
       success: boolean;
-      data: { transaction: any };
+      data: { transaction: unknown };
     }>(`/transactions/${hash}`);
   }
 
   async getTransactionStatistics() {
     return this.request<{
       success: boolean;
-      data: { statistics: any };
+      data: { statistics: unknown };
     }>('/transactions/statistics');
   }
 
@@ -288,35 +288,35 @@ class ApiService {
   async getAnalyticsSummary(period: string = 'daily', days: number = 30) {
     return this.request<{
       success: boolean;
-      data: { summary: any };
+      data: { summary: unknown };
     }>(`/analytics/summary?period=${period}&days=${days}`);
   }
 
   async getTopMetrics(period: string = 'daily') {
     return this.request<{
       success: boolean;
-      data: { metrics: any[] };
+      data: { metrics: unknown[] };
     }>(`/analytics/top-metrics?period=${period}`);
   }
 
   async getUserAnalytics() {
     return this.request<{
       success: boolean;
-      data: { statistics: any };
+      data: { statistics: unknown };
     }>('/analytics/users');
   }
 
   async getTransactionAnalytics() {
     return this.request<{
       success: boolean;
-      data: { statistics: any };
+      data: { statistics: unknown };
     }>('/analytics/transactions');
   }
 
   async getIdoAnalytics() {
     return this.request<{
       success: boolean;
-      data: { idoStats: any[] };
+      data: { idoStats: unknown[] };
     }>('/analytics/ido');
   }
 
@@ -324,14 +324,14 @@ class ApiService {
   async getNotifications(page: number = 1, limit: number = 20) {
     return this.request<{
       success: boolean;
-      data: { notifications: any[]; unreadCount: number; pagination: any };
+      data: { notifications: unknown[]; unreadCount: number; pagination: unknown };
     }>(`/notifications?page=${page}&limit=${limit}`);
   }
 
   async markNotificationAsRead(notificationId: string) {
     return this.request<{
       success: boolean;
-      data: { notification: any };
+      data: { notification: unknown };
       message: string;
     }>(`/notifications/${notificationId}/read`, {
       method: 'PUT',
@@ -350,14 +350,14 @@ class ApiService {
   async getNotificationStatistics() {
     return this.request<{
       success: boolean;
-      data: { statistics: any };
+      data: { statistics: unknown };
     }>('/notifications/statistics');
   }
 
-  async updateNotificationPreferences(preferences: any) {
+  async updateNotificationPreferences(preferences: unknown) {
     return this.request<{
       success: boolean;
-      data: { preferences: any };
+      data: { preferences: unknown };
       message: string;
     }>('/notifications/preferences', {
       method: 'PUT',
@@ -369,7 +369,7 @@ class ApiService {
   async getAdminDashboard() {
     return this.request<{
       success: boolean;
-      data: { dashboard: any };
+      data: { dashboard: unknown };
     }>('/admin/dashboard');
   }
 
@@ -382,14 +382,14 @@ class ApiService {
     
     return this.request<{
       success: boolean;
-      data: { users: any[]; pagination: any };
+      data: { users: unknown[]; pagination: unknown };
     }>(`/admin/users?${params}`);
   }
 
   async updateUserStatus(userId: string, status: string, reason?: string) {
     return this.request<{
       success: boolean;
-      data: { user: any };
+      data: { user: unknown };
       message: string;
     }>(`/admin/users/${userId}/status`, {
       method: 'PUT',
@@ -400,7 +400,7 @@ class ApiService {
   async updateKYCStatus(userId: string, status: string, reason?: string) {
     return this.request<{
       success: boolean;
-      data: { user: any };
+      data: { user: unknown };
       message: string;
     }>(`/admin/users/${userId}/kyc`, {
       method: 'PUT',
@@ -411,14 +411,14 @@ class ApiService {
   async getIdoStatus() {
     return this.request<{
       success: boolean;
-      data: { idoStatus: any };
+      data: { idoStatus: unknown };
     }>('/admin/ido/status');
   }
 
-  async performIdoAction(action: string, value?: any) {
+  async performIdoAction(action: string, value?: unknown) {
     return this.request<{
       success: boolean;
-      data: any;
+      data: unknown;
       message: string;
     }>(`/admin/ido/${action}`, {
       method: 'POST',
@@ -429,7 +429,7 @@ class ApiService {
   async getSystemHealth() {
     return this.request<{
       success: boolean;
-      data: { health: any };
+      data: { health: unknown };
     }>('/admin/system/health');
   }
 

@@ -6,7 +6,7 @@ class WebSocketService {
   private reconnectInterval = 5000;
   private isConnecting = false;
   private subscriptions: Set<string> = new Set();
-  private eventListeners: Map<string, Function[]> = new Map();
+  private eventListeners: Map<string, Array<(data?: unknown) => void>> = new Map();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -90,54 +90,62 @@ class WebSocketService {
     }, this.reconnectInterval);
   }
 
-  private handleMessage(data: any): void {
-    switch (data.type) {
+  private handleMessage(data: unknown): void {
+    if (typeof data !== 'object' || data === null) {
+      console.warn('Received non-object WebSocket message');
+      return;
+    }
+
+    const d = data as Record<string, unknown>;
+    const type = typeof d.type === 'string' ? d.type : undefined;
+
+    switch (type) {
       case 'connection':
-        console.log('WebSocket connection message:', data.message);
+        console.log('WebSocket connection message:', d.message);
         break;
-      
+
       case 'subscribed':
-        console.log('Subscribed to:', data.subscriptions);
+        console.log('Subscribed to:', d.subscriptions);
         break;
-      
+
       case 'pong':
         // Handle ping/pong for connection health
         break;
-      
+
       case 'investment_update':
-        this.emit('investment_update', data.data);
+        this.emit('investment_update', d.data);
         break;
-      
+
       case 'sale_status':
-        this.emit('sale_status', data.data);
+        this.emit('sale_status', d.data);
         break;
-      
+
       case 'price_update':
-        this.emit('price_update', data.data);
+        this.emit('price_update', d.data);
         break;
-      
+
       case 'transaction_update':
-        this.emit('transaction_update', data.data);
+        this.emit('transaction_update', d.data);
         break;
-      
+
       case 'system_announcement':
-        this.emit('system_announcement', data.data);
+        this.emit('system_announcement', d.data);
         break;
-      
+
       case 'user_notification':
-        this.emit('user_notification', data.data);
+        this.emit('user_notification', d.data);
         break;
-      
+
       case 'kyc_update':
-        this.emit('kyc_update', data.data);
+        this.emit('kyc_update', d.data);
         break;
-      
+
       case 'wallet_update':
-        this.emit('wallet_update', data.data);
+        this.emit('wallet_update', d.data);
         break;
-      
+
       default:
-        console.log('Unknown WebSocket message type:', data.type);
+        console.log('Unknown WebSocket message type:', type);
     }
   }
 
@@ -171,14 +179,14 @@ class WebSocketService {
   }
 
   // Event system
-  on(event: string, callback: Function): void {
+  on(event: string, callback: (data?: unknown) => void): void {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, []);
     }
     this.eventListeners.get(event)!.push(callback);
   }
 
-  off(event: string, callback: Function): void {
+  off(event: string, callback: (data?: unknown) => void): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
       const index = listeners.indexOf(callback);
@@ -188,7 +196,7 @@ class WebSocketService {
     }
   }
 
-  private emit(event: string, data?: any): void {
+  private emit(event: string, data?: unknown): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
       listeners.forEach(callback => {

@@ -23,7 +23,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const [theme, setTheme] = useState<'light' | 'dark' | 'lpg'>('lpg');
   const [notifications, setNotifications] = useState(3);
 
-  const themes = {
+  const themes: Record<string, { name: string; icon: React.ComponentType<{ className?: string }>; gradient: string; text: string }> = {
     light: {
       name: 'Light',
       icon: Sun,
@@ -91,20 +91,23 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <div className="flex items-center space-x-4">
             {/* Theme Selector */}
             <div className="hidden sm:flex items-center space-x-2">
-              {Object.entries(themes).map(([key, themeConfig]) => (
-                <button
-                  key={key}
-                  onClick={() => setTheme(key as any)}
-                  className={`p-2 rounded-lg transition-all duration-200 ${
-                    theme === key
-                      ? 'bg-white/20 text-white shadow-lg'
-                      : 'text-gray-400 hover:text-white hover:bg-white/10'
-                  }`}
-                  title={themeConfig.name}
-                >
-                  <themeConfig.icon className="w-4 h-4" />
-                </button>
-              ))}
+              {Object.entries(themes).map(([key, themeConfig]) => {
+                  const Icon = themeConfig.icon;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setTheme(key as 'light' | 'dark' | 'lpg')}
+                      className={`p-2 rounded-lg transition-all duration-200 ${
+                        theme === key
+                          ? 'bg-white/20 text-white shadow-lg'
+                          : 'text-gray-400 hover:text-white hover:bg-white/10'
+                      }`}
+                      title={themeConfig.name}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </button>
+                  );
+                })}
             </div>
 
             {/* Notifications */}

@@ -297,7 +297,7 @@ export default function BusinessPlanSection() {
           <div className="max-w-3xl mx-auto">
             <h3 className="text-3xl font-bold text-white mb-4">Join the Clean Energy Revolution</h3>
             <p className="text-lg text-gray-300 mb-8">
-              Be part of the transformation that's making clean energy accessible to everyone, 
+              Be part of the transformation that&apos;s making clean energy accessible to everyone, 
               everywhere. Invest in the future of sustainable energy today.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

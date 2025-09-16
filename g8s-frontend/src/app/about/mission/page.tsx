@@ -25,17 +25,17 @@ export default function MissionPage() {
     {
       icon: Shield,
       title: "Security First",
-      description: "We prioritize the security of our users' investments with audited smart contracts and robust security measures."
+  description: "We prioritize the security of our users\' investments with audited smart contracts and robust security measures."
     },
     {
       icon: Globe,
       title: "Global Impact",
-      description: "Our mission extends beyond borders, bringing clean energy solutions to communities worldwide."
+  description: "Our mission extends beyond borders, bringing clean energy solutions to communities worldwide."
     },
     {
       icon: Users,
       title: "Community Driven",
-      description: "We believe in the power of community and work together to build a sustainable energy future."
+  description: "We believe in the power of community and work together to build a sustainable energy future."
     },
     {
       icon: TrendingUp,
@@ -107,9 +107,9 @@ export default function MissionPage() {
             </h1>
             
             <p className="text-xl text-gray-300 mb-8 max-w-3xl mx-auto">
-              We are revolutionizing the clean energy sector by democratizing access to LPG investments 
-              through blockchain technology, creating a sustainable future for generations to come.
-            </p>
+                        We are revolutionizing the clean energy sector by democratizing access to LPG investments 
+                        through blockchain technology, creating a sustainable future for generations to come.
+                      </p>
           </div>
         </div>
       </motion.section>
@@ -208,7 +208,7 @@ export default function MissionPage() {
               </div>
               
               <p className="text-lg text-gray-300 mb-6">
-                To become the world's leading platform for clean energy tokenization, 
+                To become the world&apos;s leading platform for clean energy tokenization, 
                 creating a global ecosystem where sustainable energy investments drive 
                 environmental and economic prosperity.
               </p>

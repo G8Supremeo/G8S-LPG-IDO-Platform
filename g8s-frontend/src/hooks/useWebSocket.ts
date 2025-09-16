@@ -37,10 +37,15 @@ export function useWebSocket() {
       }));
     };
 
-    const handleError = (error: any) => {
+    const handleError = (error: unknown) => {
+      const message =
+        error && typeof error === 'object' && 'message' in (error as Record<string, unknown>)
+          ? String((error as Record<string, unknown>).message)
+          : 'WebSocket connection error';
+
       setState(prev => ({
         ...prev,
-        error: error.message || 'WebSocket connection error',
+        error: message,
         connecting: false,
       }));
     };
@@ -98,11 +103,11 @@ export function useWebSocket() {
 
 // Hook for real-time investment updates
 export function useInvestmentUpdates() {
-  const [updates, setUpdates] = useState<any[]>([]);
-  const [latestUpdate, setLatestUpdate] = useState<any>(null);
+  const [updates, setUpdates] = useState<unknown[]>([]);
+  const [latestUpdate, setLatestUpdate] = useState<unknown | null>(null);
 
   useEffect(() => {
-    const handleInvestmentUpdate = (data: any) => {
+    const handleInvestmentUpdate = (data: unknown) => {
       setLatestUpdate(data);
       setUpdates(prev => [data, ...prev.slice(0, 9)]); // Keep last 10 updates
     };
@@ -126,8 +131,10 @@ export function useSaleStatusUpdates() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   useEffect(() => {
-    const handleSaleStatusUpdate = (data: any) => {
-      setStatus(data.status);
+    const handleSaleStatusUpdate = (data: unknown) => {
+      if (data && typeof data === 'object' && 'status' in (data as Record<string, unknown>)) {
+        setStatus(String((data as Record<string, unknown>).status));
+      }
       setLastUpdate(new Date());
     };
 
@@ -146,14 +153,17 @@ export function useSaleStatusUpdates() {
 
 // Hook for real-time price updates
 export function usePriceUpdates() {
-  const [priceUpdates, setPriceUpdates] = useState<Map<string, any>>(new Map());
-  const [latestPrices, setLatestPrices] = useState<Map<string, any>>(new Map());
+  const [priceUpdates, setPriceUpdates] = useState<Map<string, unknown>>(new Map());
+  const [latestPrices, setLatestPrices] = useState<Map<string, unknown>>(new Map());
 
   useEffect(() => {
-    const handlePriceUpdate = (data: any) => {
-      const token = data.token || 'unknown';
+    const handlePriceUpdate = (data: unknown) => {
+      const token = data && typeof data === 'object' && 'token' in (data as Record<string, unknown>)
+        ? String((data as Record<string, unknown>).token)
+        : 'unknown';
+
       const update = {
-        ...data,
+        ...(data as Record<string, unknown>),
         timestamp: new Date(),
       };
 
@@ -165,8 +175,10 @@ export function usePriceUpdates() {
 
       setLatestPrices(prev => {
         const newMap = new Map(prev);
+        const dataObj = (data as Record<string, unknown>) || {};
+        const price = 'price' in dataObj ? dataObj.price : undefined;
         newMap.set(token, {
-          price: data.price,
+          price,
           timestamp: new Date(),
         });
         return newMap;
@@ -190,11 +202,11 @@ export function usePriceUpdates() {
 
 // Hook for real-time transaction updates
 export function useTransactionUpdates() {
-  const [updates, setUpdates] = useState<any[]>([]);
-  const [latestUpdate, setLatestUpdate] = useState<any>(null);
+  const [updates, setUpdates] = useState<unknown[]>([]);
+  const [latestUpdate, setLatestUpdate] = useState<unknown | null>(null);
 
   useEffect(() => {
-    const handleTransactionUpdate = (data: any) => {
+    const handleTransactionUpdate = (data: unknown) => {
       setLatestUpdate(data);
       setUpdates(prev => [data, ...prev.slice(0, 9)]); // Keep last 10 updates
     };
@@ -214,11 +226,11 @@ export function useTransactionUpdates() {
 
 // Hook for system announcements
 export function useSystemAnnouncements() {
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [latestAnnouncement, setLatestAnnouncement] = useState<any>(null);
+  const [announcements, setAnnouncements] = useState<unknown[]>([]);
+  const [latestAnnouncement, setLatestAnnouncement] = useState<unknown | null>(null);
 
   useEffect(() => {
-    const handleSystemAnnouncement = (data: any) => {
+    const handleSystemAnnouncement = (data: unknown) => {
       setLatestAnnouncement(data);
       setAnnouncements(prev => [data, ...prev.slice(0, 4)]); // Keep last 5 announcements
     };
@@ -238,14 +250,16 @@ export function useSystemAnnouncements() {
 
 // Hook for user notifications
 export function useUserNotifications() {
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<unknown[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    const handleUserNotification = (data: any) => {
+    const handleUserNotification = (data: unknown) => {
       setNotifications(prev => [data, ...prev]);
-      if (!data.read) {
-        setUnreadCount(prev => prev + 1);
+      if (data && typeof data === 'object' && 'read' in (data as Record<string, unknown>)) {
+        if (!(data as Record<string, unknown>).read) {
+          setUnreadCount(prev => prev + 1);
+        }
       }
     };
 
@@ -257,19 +271,24 @@ export function useUserNotifications() {
   }, []);
 
   const markAsRead = (notificationId: string) => {
+    const isNotif = (n: unknown): n is Record<string, unknown> => !!n && typeof n === 'object' && 'id' in n;
+
     setNotifications(prev =>
-      prev.map(notification =>
-        notification.id === notificationId
-          ? { ...notification, read: true }
-          : notification
-      )
+      prev.map(notification => {
+        if (isNotif(notification) && notification.id === notificationId) {
+          return { ...notification, read: true } as Record<string, unknown>;
+        }
+        return notification;
+      })
     );
     setUnreadCount(prev => Math.max(0, prev - 1));
   };
 
   const markAllAsRead = () => {
+    const isNotif = (n: unknown): n is Record<string, unknown> => !!n && typeof n === 'object' && 'id' in n;
+
     setNotifications(prev =>
-      prev.map(notification => ({ ...notification, read: true }))
+      prev.map(notification => (isNotif(notification) ? { ...notification, read: true } as Record<string, unknown> : notification))
     );
     setUnreadCount(0);
   };
@@ -288,8 +307,10 @@ export function useKYCUpdates() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   useEffect(() => {
-    const handleKYCUpdate = (data: any) => {
-      setKycStatus(data.status);
+    const handleKYCUpdate = (data: unknown) => {
+      if (data && typeof data === 'object' && 'status' in (data as Record<string, unknown>)) {
+        setKycStatus(String((data as Record<string, unknown>).status));
+      }
       setLastUpdate(new Date());
     };
 
@@ -312,8 +333,10 @@ export function useWalletUpdates() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   useEffect(() => {
-    const handleWalletUpdate = (data: any) => {
-      setWalletStatus(data.status);
+    const handleWalletUpdate = (data: unknown) => {
+      if (data && typeof data === 'object' && 'status' in (data as Record<string, unknown>)) {
+        setWalletStatus(String((data as Record<string, unknown>).status));
+      }
       setLastUpdate(new Date());
     };
 
