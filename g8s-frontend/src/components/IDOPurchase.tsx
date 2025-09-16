@@ -271,8 +271,12 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   const computedTokensOutHuman = (() => {
     if (!pusdAmount) return '0';
     const pusdNum = parseFloat(pusdAmount || '0');
-    if (priceNum && priceNum > 0) {
-      const tokensFloat = pusdNum / priceNum;
+    
+    // Use the standard price of 2333 PUSD per G8S if contract price is not available
+    const effectivePrice = priceNum && priceNum > 0 ? priceNum : 2333;
+    
+    if (effectivePrice > 0) {
+      const tokensFloat = pusdNum / effectivePrice;
       // limit to 6 decimals and trim trailing zeros
       const fixed = tokensFloat.toFixed(6).replace(/(?:\.0+|(?<=\.[0-9]*?)0+)$/, '');
       // add thousands separators for the integer part
@@ -451,11 +455,9 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               />
             </div>
 
-            {typeof idoPrice === 'bigint' && (
-              <div className="text-center text-sm text-gray-400">
-                Price: {formatUnits(idoPrice as bigint, decimalsNum)} PUSD per G8S token
-              </div>
-            )}
+            <div className="text-center text-sm text-gray-400">
+              Price: {priceNum && priceNum > 0 ? priceNum.toFixed(0) : '2333'} PUSD per G8S token
+            </div>
 
             {pusdAmount && (
               <div className="text-center text-sm text-gray-300">
