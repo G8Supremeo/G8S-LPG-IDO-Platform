@@ -329,6 +329,10 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   return (
     <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 border border-white/20">
       <div className="text-center mb-8">
+        <div className="inline-flex items-center space-x-2 bg-green-500/20 border border-green-500/30 rounded-full px-4 py-2 mb-4">
+          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          <span className="text-green-400 text-sm font-medium">LATEST v2.2 - 2333 PUSD = 1 G8S</span>
+        </div>
         <h2 className="text-3xl font-bold text-white mb-4">Purchase G8S Tokens</h2>
         <p className="text-gray-300">
           Connect your wallet and purchase G8S tokens using PUSD
@@ -542,7 +546,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               </p>
             )}
           </div>
-          <p className="text-center text-xs text-gray-500">Build: IDOPurchase v2.1</p>
+          <p className="text-center text-xs text-gray-500">Build: IDOPurchase v2.2 - Fixed Display (2333 PUSD = 1 G8S)</p>
         </div>
       )}
     </div>
