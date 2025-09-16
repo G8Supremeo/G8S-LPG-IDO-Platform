@@ -28,16 +28,17 @@ This report consolidates company/financial context, token design, calculations, 
 
 ## 3) Valuation (Assumptions)
 - Early MVP with deployed contracts and functioning sale flow on Sepolia.
-- Chosen public sale price to meet target: **$1.5555555556 per G8S** (≈ ₦2,333.333333 at ₦1,500/$).
+- Chosen public sale price to meet target (expressed in NGN units on-chain): **2,333 PUSD tokens per 1 G8S** where the PUSD used in deployment has **decimals = 0** and is treated as a naira‑denominated unit (1 PUSD token ≈ ₦1 for sale math).
+- USD equivalence (for reporting), using ₦1,500/$: **$1.5555555556 per G8S** (since ₦2,333 ÷ 1,500 = $1.555…)
 - Resulting Fully Diluted Valuation (FDV):
   - 1,000,000,000 × $1.5555555556 ≈ **$1,555,555,556** (≈ **₦2,333,333,333,333** at ₦1,500/$).
-- Notes: Previous placeholders (e.g., $0.05) are superseded by this selected price for the IDO.
+- Notes: The on‑chain price unit is integer‑only due to PUSD having 0 decimals; fractional prices are represented by the NGN peg assumption rather than token decimals.
 
 ---
 
 ## 4) Fundraising Target (NGN)
 - **Target**: **₦700,000,000,000** (₦700B).
-- Derived by selling 300,000,000 tokens (30% of 1B) at **₦2,333.333333** each (≈ $1.5555555556 × 1,500 NGN/USD).
+- Derived by selling 300,000,000 tokens (30% of 1B) at **₦2,333** each (on‑chain price 2,333 PUSD tokens with decimals=0; reporting equivalent ≈ $1.5555555556 × 1,500 NGN/USD).
 
 ---
 
@@ -75,13 +76,16 @@ Total raise:
 \[ \text{Raise}_{usd} = S \times P_{usd} \]
 \[ \text{Raise}_{ngn} = S \times P_{ngn} = S \times P_{usd} \times R \]
 
-**Final (selected for IDO)**: \( P_{usd} = 1.5555555556, R = 1{,}500 \)
-  - \( P_{ngn} = 2{,}333.333333 \)
+**Final (selected for IDO)**:
+- On-chain representation (PUSD decimals = 0): `pricePUSD = 2333`
+- Reporting equivalence (for USD view): \( P_{usd} = 1.5555555556, R = 1{,}500 \)
+  - \( P_{ngn} = 2{,}333 \)
   - \( \text{Raise}_{usd} = 300{,}000{,}000 \times 1.5555555556 \approx 466{,}666{,}666.68 \)
-  - \( \text{Raise}_{ngn} = 300{,}000{,}000 \times 2{,}333.333333 = ₦700{,}000{,}000{,}000 \)
+  - \( \text{Raise}_{ngn} = 300{,}000{,}000 \times 2{,}333 = ₦699{,}900{,}000{,}000 \) (≈ ₦700B)
 
-On-chain price value (18 decimals) to use in `setPricePUSD`:
-\[ \text{pricePUSD\_wei} = 1.5555555556 \times 10^{18} \approx \textbf{1555555555555555600} \]
+On-chain price setting with arbitrary PUSD decimals:
+\[ \text{pricePUSD\_onchain} = P_{usd} \times 10^{\text{PUSD\_decimals}} \]
+For this deployment: `PUSD_decimals = 0` → `setPricePUSD(2333)`.
 
 ---
 
@@ -210,9 +214,9 @@ That file guided multi‑doc outputs (PRD, test plan/cases, deployment) and acce
 ---
 
 ## Summary
-- Tokenomics are harmonized to the deployed code: 1B supply, 30% IDO (300M), **public sale price $1.5555555556** (≈ ₦2,333.333333 at ₦1,500/$), target raise **₦700B**. 
-- FDV ≈ **$1.5556B** (≈ ₦2.3333T). 
-- All calculations are explicit and re‑computable for any chosen price/FX. 
+- Tokenomics reflect on‑chain reality: 1B supply, 30% IDO (300M), on‑chain sale price `pricePUSD=2333` with PUSD decimals=0 (interpreted as ₦2,333 per G8S), reporting equivalence **$1.5556** at ₦1,500/$, target raise ~**₦700B**.
+- FDV ≈ **$1.5556B** (≈ ₦2.3333T).
+- All calculations are explicit and re‑computable for any chosen price/FX or token decimal configuration.
 - The stack is now Supabase‑native, production‑deployable, and resilient to typical infra issues (RPC latency, missing envs, event subscription limits).
 
 ---

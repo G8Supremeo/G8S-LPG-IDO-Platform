@@ -224,6 +224,20 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   const decimalsLoaded = typeof pusdDecimals === 'number';
   const decimalsNum = decimalsLoaded ? (pusdDecimals as number) : 18;
 
+  // Derived pricing and tokens-out for display (human-friendly)
+  const priceNum = idoPrice ? Number(formatUnits(idoPrice as bigint, decimalsNum)) : undefined;
+  let computedTokensOutWei: bigint = 0n;
+  try {
+    if (pusdAmount && idoPrice) {
+      const amount = parseUnits(pusdAmount, decimalsNum);
+      const ONE = 1000000000000000000n;
+      computedTokensOutWei = (amount * ONE) / (idoPrice as bigint);
+    }
+  } catch {}
+  const computedTokensOutHuman = Number(
+    computedTokensOutWei ? formatEther(computedTokensOutWei) : '0'
+  ).toLocaleString(undefined, { maximumFractionDigits: 6 });
+
   const hasEnoughBalance = pusdBalance && pusdAmount 
     ? Number(formatUnits(pusdBalance.value, pusdBalance.decimals)) >= parseFloat(pusdAmount)
     : false;
@@ -398,7 +412,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
 
             {pusdAmount && (
               <div className="text-center text-sm text-gray-300">
-                You will receive: <span className="text-white font-semibold">{Number(tokenAmount || '0').toLocaleString(undefined, { maximumFractionDigits: 6 })}</span> G8S
+                You will receive: <span className="text-white font-semibold">{computedTokensOutHuman}</span> G8S
               </div>
             )}
 
@@ -449,26 +463,28 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 </motion.button>
               ) : null}
 
-              <motion.button
-                whileHover={{ scale: canPurchase ? 1.02 : 1 }}
-                whileTap={{ scale: canPurchase ? 0.98 : 1 }}
-                onClick={handlePurchase}
-                disabled={!canPurchase || isPurchasePending || isApproving || isApprovalPending}
-                className="w-full px-6 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
-              >
-                {isPurchasing || isPurchasePending ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>{isPurchasePending ? 'Waiting for confirmation...' : 'Purchasing...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-5 h-5" />
-                    <span>Buy G8S Tokens</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </motion.button>
+              {hasEnoughAllowance && pusdAmount && hasEnoughBalance ? (
+                <motion.button
+                  whileHover={{ scale: canPurchase ? 1.02 : 1 }}
+                  whileTap={{ scale: canPurchase ? 0.98 : 1 }}
+                  onClick={handlePurchase}
+                  disabled={!canPurchase || isPurchasePending || isApproving || isApprovalPending}
+                  className="w-full px-6 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
+                >
+                  {isPurchasing || isPurchasePending ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>{isPurchasePending ? 'Waiting for confirmation...' : 'Purchasing...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-5 h-5" />
+                      <span>Buy G8S Tokens</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </motion.button>
+              ) : null}
             </div>
 
             {/* Validation Messages */}

@@ -34,6 +34,14 @@ export default function RealTimeStats() {
     functionName: "pricePUSD", 
     query: { enabled: Boolean(ido), refetchInterval: 5000 } 
   });
+
+  // PUSD decimals
+  const { data: pusdDecimals } = useReadContract({
+    abi: ABI.ERC20,
+    address: pusd,
+    functionName: "decimals",
+    query: { enabled: Boolean(pusd) }
+  });
   
   const { data: tokensForSale } = useReadContract({ 
     abi: ABI.IDO, 
@@ -47,6 +55,13 @@ export default function RealTimeStats() {
     address: ido, 
     functionName: "tokensSold", 
     query: { enabled: Boolean(ido), refetchInterval: 5000 } 
+  });
+
+  const { data: totalRaisedPUSD } = useReadContract({
+    abi: ABI.IDO,
+    address: ido,
+    functionName: "totalRaisedPUSD",
+    query: { enabled: Boolean(ido), refetchInterval: 5000 }
   });
   
   const { data: startTime } = useReadContract({ 
@@ -70,25 +85,34 @@ export default function RealTimeStats() {
     query: { enabled: Boolean(ido), refetchInterval: 5000 } 
   });
 
+  // G8S total supply for FDV/market cap approximation
+  const { data: totalSupply } = useReadContract({
+    abi: ABI.G8S,
+    address: g8s,
+    functionName: "totalSupply",
+    query: { enabled: Boolean(g8s) }
+  });
+
   // Calculate real-time statistics
   const stats = useMemo(() => {
     try {
-      const priceValue = typeof price === "bigint" ? parseFloat(formatUnits(price as bigint, 18)) : 0;
+      const decimalsNum = typeof pusdDecimals === "number" ? (pusdDecimals as number) : 0;
+      const priceValue = typeof price === "bigint" ? parseFloat(formatUnits(price as bigint, decimalsNum)) : 0;
       const tokensForSaleValue = typeof tokensForSale === "bigint" ? parseFloat(formatUnits(tokensForSale as bigint, 18)) : 0;
       const tokensSoldValue = typeof tokensSold === "bigint" ? parseFloat(formatUnits(tokensSold as bigint, 18)) : 0;
-      
-      const totalRaised = tokensSoldValue * priceValue;
+      const totalRaisedPusdValue = typeof totalRaisedPUSD === "bigint" ? parseFloat(formatUnits(totalRaisedPUSD as bigint, decimalsNum)) : (tokensSoldValue * priceValue);
       const progressPercent = tokensForSaleValue > 0 ? (tokensSoldValue / tokensForSaleValue) * 100 : 0;
       const remaining = tokensForSaleValue - tokensSoldValue;
-      const marketCap = tokensSoldValue * priceValue * 10; // Estimated market cap
+      const totalSupplyValue = typeof totalSupply === "bigint" ? parseFloat(formatUnits(totalSupply as bigint, 18)) : 1000000000; // fallback 1B
+      const fdvPusd = totalSupplyValue * priceValue;
       
       return {
-        totalRaised,
+        totalRaised: totalRaisedPusdValue,
         tokensSold: tokensSoldValue,
         tokensForSale: tokensForSaleValue,
         remaining,
         progressPercent,
-        marketCap,
+        marketCap: fdvPusd,
         price: priceValue,
         buyersCount: Math.floor(tokensSoldValue / 1000) + 1247, // Estimated based on tokens sold
         isActive: !paused
@@ -106,7 +130,7 @@ export default function RealTimeStats() {
         isActive: false
       };
     }
-  }, [price, tokensForSale, tokensSold, paused]);
+  }, [price, tokensForSale, tokensSold, totalRaisedPUSD, totalSupply, pusdDecimals, paused]);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000000) return (num / 1000000000).toFixed(1) + 'B';
@@ -115,19 +139,17 @@ export default function RealTimeStats() {
     return num.toFixed(2);
   };
 
-  const formatCurrency = (num: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
+  const formatPusd = (num: number) => {
+    return new Intl.NumberFormat('en-NG', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(num);
+    }).format(num) + ' PUSD';
   };
 
   const mainStats = [
     {
       label: "Total Raised",
-      value: formatCurrency(stats.totalRaised),
+      value: formatPusd(stats.totalRaised),
       change: "+12.5%",
       trend: "up",
       icon: DollarSign,
@@ -151,7 +173,7 @@ export default function RealTimeStats() {
     },
     {
       label: "Market Cap",
-      value: formatCurrency(stats.marketCap),
+      value: formatPusd(stats.marketCap),
       change: "+5.7%",
       trend: "up",
       icon: BarChart3,
@@ -295,15 +317,15 @@ export default function RealTimeStats() {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-300">Token Price:</span>
-                  <span className="text-white font-semibold">{stats.price.toFixed(2)} PUSD</span>
+                  <span className="text-white font-semibold">{stats.price.toLocaleString(undefined, { maximumFractionDigits: 6 })} PUSD</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Total Supply:</span>
-                  <span className="text-white font-semibold">1B G8S</span>
+                  <span className="text-white font-semibold">{formatNumber(typeof totalSupply === 'bigint' ? parseFloat(formatUnits(totalSupply as bigint, 18)) : 1000000000)}</span> G8S
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">IDO Allocation:</span>
-                  <span className="text-white font-semibold">300M G8S</span>
+                  <span className="text-white font-semibold">{formatNumber(stats.tokensForSale)} G8S</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Sale Progress:</span>
@@ -317,7 +339,7 @@ export default function RealTimeStats() {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-300">Total Raised:</span>
-                  <span className="text-white font-semibold">{formatCurrency(stats.totalRaised)}</span>
+                  <span className="text-white font-semibold">{formatPusd(stats.totalRaised)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Tokens Sold:</span>
@@ -329,7 +351,7 @@ export default function RealTimeStats() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Avg. Purchase:</span>
-                  <span className="text-white font-semibold">{formatCurrency(stats.totalRaised / Math.max(stats.buyersCount, 1))}</span>
+                  <span className="text-white font-semibold">{formatPusd(stats.totalRaised / Math.max(stats.buyersCount, 1))}</span>
                 </div>
               </div>
             </div>
@@ -345,7 +367,7 @@ export default function RealTimeStats() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Market Cap:</span>
-                  <span className="text-white font-semibold">{formatCurrency(stats.marketCap)}</span>
+                  <span className="text-white font-semibold">{formatPusd(stats.marketCap)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-300">Remaining:</span>
