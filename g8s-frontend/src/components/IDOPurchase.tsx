@@ -3,13 +3,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
-  ConnectButton, 
   useAccount, 
   useBalance, 
   useReadContract, 
   useWriteContract, 
   useWaitForTransactionReceipt 
 } from "wagmi";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { parseEther, parseUnits, formatEther, formatUnits } from "viem";
 import { useChainId, useSwitchChain } from "wagmi";
 import { sepolia } from "wagmi/chains";
@@ -126,7 +126,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   useEffect(() => {
     if (tokenAmount && idoPrice) {
       const tokens = parseFloat(tokenAmount);
-      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 18;
+      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 0;
       const price = Number(formatUnits(idoPrice as bigint, decimals));
       const pusd = tokens * price;
       setPusdAmount(pusd.toFixed(6));
@@ -139,7 +139,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   useEffect(() => {
     if (pusdAmount && idoPrice) {
       const pusd = parseFloat(pusdAmount);
-      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 18;
+      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 0;
       const price = Number(formatUnits(idoPrice as bigint, decimals));
       const tokens = pusd / price;
       setTokenAmount(tokens.toFixed(2));
@@ -158,7 +158,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
       if (chainId !== sepolia.id) {
         await switchChainAsync({ chainId: sepolia.id });
       }
-      const decimals = typeof pusdDecimals === 'number' ? pusdDecimals : 18;
+      const decimals = typeof pusdDecimals === 'number' ? pusdDecimals : 0;
       const amount = parseUnits(pusdAmount, decimals);
       const hash = await writeContractAsync({
         address: CONTRACTS.PUSD_ADDRESS as `0x${string}`,
@@ -186,7 +186,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
       if (chainId !== sepolia.id) {
         await switchChainAsync({ chainId: sepolia.id });
       }
-      const decimals = typeof pusdDecimals === 'number' ? pusdDecimals : 18;
+      const decimals = typeof pusdDecimals === 'number' ? pusdDecimals : 0;
       const amount = parseUnits(pusdAmount, decimals);
       if (!hasEnoughAllowance) {
         throw new Error('Please approve PUSD first.');
@@ -222,13 +222,13 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   }, [isPurchaseSuccess]);
 
   const decimalsLoaded = typeof pusdDecimals === 'number';
-  const decimalsNum = decimalsLoaded ? (pusdDecimals as number) : 18;
+  const decimalsNum = decimalsLoaded ? (pusdDecimals as number) : 0;
 
   // Derived pricing and tokens-out for display (human-friendly)
-  const priceNum = idoPrice ? Number(formatUnits(idoPrice as bigint, decimalsNum)) : undefined;
+  const priceNum = typeof idoPrice === 'bigint' ? Number(formatUnits(idoPrice as bigint, decimalsNum)) : undefined;
   let computedTokensOutWei: bigint = 0n;
   try {
-    if (pusdAmount && idoPrice) {
+    if (pusdAmount && typeof idoPrice === 'bigint') {
       const amount = parseUnits(pusdAmount, decimalsNum);
       const ONE = 1000000000000000000n;
       computedTokensOutWei = (amount * ONE) / (idoPrice as bigint);
@@ -248,7 +248,8 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
 
   const nowSec = Math.floor(Date.now() / 1000);
   const withinWindow = saleStart && saleEnd ? (Number(saleStart) <= nowSec && nowSec <= Number(saleEnd)) : true;
-  const saleActive = !isPaused && withinWindow;
+  const pausedBool = isPaused === true;
+  const saleActive = !pausedBool && withinWindow;
 
   // Pre-check cap based on entered PUSD
   let exceedsCap = false;
@@ -313,8 +314,8 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               <h3 className="text-lg font-semibold text-white">Sale Progress</h3>
               <div className="flex items-center space-x-2">
                 <div className={`w-3 h-3 rounded-full ${isPaused ? 'bg-red-400' : 'bg-green-400 animate-pulse'}`} />
-                <span className={`text-sm font-medium ${isPaused ? 'text-red-400' : 'text-green-400'}`}>
-                  {isPaused ? 'Paused' : 'Active'}
+                <span className={`text-sm font-medium ${pausedBool ? 'text-red-400' : 'text-green-400'}`}>
+                  {pausedBool ? 'Paused' : 'Active'}
                 </span>
               </div>
             </div>
@@ -323,13 +324,13 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-300">Tokens Sold</span>
                 <span className="text-white">
-                  {tokensSold ? formatEther(tokensSold) : "0"} G8S
+                  {typeof tokensSold === 'bigint' ? formatEther(tokensSold as bigint) : "0"} G8S
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-300">Total Supply</span>
                 <span className="text-white">
-                  {tokensForSale ? formatEther(tokensForSale) : "0"} G8S
+                  {typeof tokensForSale === 'bigint' ? formatEther(tokensForSale as bigint) : "0"} G8S
                 </span>
               </div>
               <div className="w-full bg-gray-700/50 rounded-full h-3">
@@ -383,7 +384,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 min={0}
                 step={0.01}
                 inputMode="decimal"
-                disabled={isPaused}
+                disabled={pausedBool}
               />
             </div>
 
@@ -400,11 +401,11 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 min={0}
                 step={decimalsNum === 0 ? 1 : 0.000001}
                 inputMode="numeric"
-                disabled={isPaused}
+                disabled={pausedBool}
               />
             </div>
 
-            {idoPrice && (
+            {typeof idoPrice === 'bigint' && (
               <div className="text-center text-sm text-gray-400">
                 Price: {formatUnits(idoPrice as bigint, decimalsNum)} PUSD per G8S token
               </div>
@@ -446,7 +447,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleApprove}
-                  disabled={isApproving || isApprovalPending || isPaused}
+                  disabled={isApproving || isApprovalPending || pausedBool}
                   className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
                 >
                   {isApproving || isApprovalPending ? (
