@@ -188,6 +188,9 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
       }
       const decimals = typeof pusdDecimals === 'number' ? pusdDecimals : 18;
       const amount = parseUnits(pusdAmount, decimals);
+      if (!hasEnoughAllowance) {
+        throw new Error('Please approve PUSD first.');
+      }
       const hash = await writeContractAsync({
         address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
         abi: ABI.IDO,
@@ -363,6 +366,9 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 onChange={(e) => setTokenAmount(e.target.value)}
                 placeholder="Enter amount"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
+                min={0}
+                step={0.01}
+                inputMode="decimal"
                 disabled={isPaused}
               />
             </div>
@@ -377,6 +383,9 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 onChange={(e) => setPusdAmount(e.target.value)}
                 placeholder="Enter PUSD amount"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
+                min={0}
+                step={decimalsNum === 0 ? 1 : 0.000001}
+                inputMode="numeric"
                 disabled={isPaused}
               />
             </div>
@@ -384,6 +393,12 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
             {idoPrice && (
               <div className="text-center text-sm text-gray-400">
                 Price: {formatUnits(idoPrice as bigint, decimalsNum)} PUSD per G8S token
+              </div>
+            )}
+
+            {pusdAmount && (
+              <div className="text-center text-sm text-gray-300">
+                You will receive: <span className="text-white font-semibold">{Number(tokenAmount || '0').toLocaleString(undefined, { maximumFractionDigits: 6 })}</span> G8S
               </div>
             )}
 
@@ -438,7 +453,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 whileHover={{ scale: canPurchase ? 1.02 : 1 }}
                 whileTap={{ scale: canPurchase ? 0.98 : 1 }}
                 onClick={handlePurchase}
-                disabled={!canPurchase || isPurchasePending}
+                disabled={!canPurchase || isPurchasePending || isApproving || isApprovalPending}
                 className="w-full px-6 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
               >
                 {isPurchasing || isPurchasePending ? (
