@@ -412,7 +412,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
 
             {pusdAmount && (
               <div className="text-center text-sm text-gray-300">
-                You will receive: <span className="text-white font-semibold">{computedTokensOutHuman}</span> G8S
+                You will receive (est.): <span className="text-white font-semibold">{computedTokensOutHuman}</span> G8S
               </div>
             )}
 
@@ -506,6 +506,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               </p>
             )}
           </div>
+          <p className="text-center text-xs text-gray-500">Build: IDOPurchase v2.1</p>
         </div>
       )}
     </div>
