@@ -126,25 +126,27 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   useEffect(() => {
     if (tokenAmount && idoPrice) {
       const tokens = parseFloat(tokenAmount);
-      const price = Number(formatEther(idoPrice));
+      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 18;
+      const price = Number(formatUnits(idoPrice as bigint, decimals));
       const pusd = tokens * price;
       setPusdAmount(pusd.toFixed(6));
     } else {
       setPusdAmount("");
     }
-  }, [tokenAmount, idoPrice]);
+  }, [tokenAmount, idoPrice, pusdDecimals]);
 
   // Calculate token amount when PUSD amount changes
   useEffect(() => {
     if (pusdAmount && idoPrice) {
       const pusd = parseFloat(pusdAmount);
-      const price = Number(formatEther(idoPrice));
+      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 18;
+      const price = Number(formatUnits(idoPrice as bigint, decimals));
       const tokens = pusd / price;
       setTokenAmount(tokens.toFixed(2));
     } else {
       setTokenAmount("");
     }
-  }, [pusdAmount, idoPrice]);
+  }, [pusdAmount, idoPrice, pusdDecimals]);
 
   const handleApprove = async () => {
     if (!address || !pusdAmount) return;
@@ -343,7 +345,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               <div className="flex justify-between">
                 <span className="text-gray-300">Allowance</span>
                 <span className="text-white font-semibold">
-                  {pusdAllowance ? formatEther(pusdAllowance) : "0"} PUSD
+                  {pusdAllowance ? formatUnits(pusdAllowance as bigint, decimalsNum) : "0"} PUSD
                 </span>
               </div>
             </div>
@@ -381,7 +383,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
 
             {idoPrice && (
               <div className="text-center text-sm text-gray-400">
-                Price: {formatEther(idoPrice)} PUSD per G8S token
+                Price: {formatUnits(idoPrice as bigint, decimalsNum)} PUSD per G8S token
               </div>
             )}
 
