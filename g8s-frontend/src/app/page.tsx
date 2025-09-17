@@ -47,6 +47,7 @@ import RealLPGSlideshow from "@/components/RealLPGSlideshow";
 import EnhancedBusinessPlan from "@/components/EnhancedBusinessPlan";
 import DemoVideoSection from "@/components/DemoVideoSection";
 import RealTimeStats from "@/components/RealTimeStats";
+import IDOPurchase from "@/components/IDOPurchase";
 
 function useContractAddress(addr?: string) {
   return addr && addr.length > 0 ? (addr as `0x${string}`) : undefined;
@@ -58,6 +59,22 @@ export default function Page() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("overview");
+
+  // Handle URL hash changes for direct navigation to invest section
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === "#invest") {
+        setActiveSection("invest");
+      }
+    };
+
+    // Check initial hash
+    handleHashChange();
+
+    // Listen for hash changes
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
   const [liked, setLiked] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const ido = useContractAddress(CONTRACTS.IDO_ADDRESS);
@@ -176,16 +193,16 @@ export default function Page() {
 
   const g8sAmount = useMemo(() => {
     try {
-      if (pusdAmount && typeof price === "bigint") {
-        const pusd = parseUnits(pusdAmount, 18);
-        const g8s = (pusd * BigInt(10**18)) / price as bigint;
-        return formatUnits(g8s, 18);
+      if (pusdAmount) {
+        const pusdNum = parseFloat(pusdAmount);
+        const tokensFloat = pusdNum / 2333; // 2333 PUSD per G8S
+        return tokensFloat.toFixed(6).replace(/\.?0+$/, ''); // Remove trailing zeros
       }
       return "0";
     } catch {
       return "0";
     }
-  }, [pusdAmount, price]);
+  }, [pusdAmount]);
 
   const features = [
     {
@@ -334,8 +351,8 @@ export default function Page() {
             transition={{ duration: 0.5 }}
             className="container mx-auto px-4 py-12"
           >
-            {/* Investment Section */}
-            <div className="max-w-6xl mx-auto">
+            {/* Investment Section - Same as IDO Purchase */}
+            <div className="max-w-4xl mx-auto">
               <div className="text-center mb-12">
                 <motion.div
                   initial={{ scale: 0, opacity: 0 }}
@@ -347,32 +364,107 @@ export default function Page() {
                   <span className="text-white font-medium">Investment Portal</span>
                 </motion.div>
                 
+                <div className="relative inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 border-2 border-green-400/40 rounded-full px-6 py-3 mb-6 shadow-lg shadow-green-500/20">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-400/10 via-emerald-400/10 to-green-400/10 rounded-full animate-pulse"></div>
+                  <div className="relative flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full animate-pulse shadow-sm shadow-green-400/50"></div>
+                    <span className="text-green-300 text-sm font-bold tracking-wide">FIXED v2.3 - 2333 PUSD = 1 G8S</span>
+                    <div className="w-1 h-1 bg-green-400 rounded-full animate-ping"></div>
+                  </div>
+                </div>
+                
                 <h2 className="text-4xl font-bold text-white mb-4">Invest in Clean Energy</h2>
-                <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+                <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-8">
                   Join the G8S LPG token sale and be part of the sustainable energy revolution
                 </p>
               </div>
 
-              {address ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                    <div className="flex items-center space-x-3 mb-6">
-                      <Wallet className="w-8 h-8 text-green-400" />
-                      <h3 className="text-2xl font-bold text-white">Buy G8S Tokens</h3>
-                    </div>
-                    
-                    <div className="space-y-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-3">
-                          Amount (PUSD)
-                        </label>
-                        <div className="relative">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            placeholder="Enter PUSD amount"
-                            className="w-full px-6 py-4 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
-                            value={pusdAmount}
+              {/* IDO Purchase Component */}
+              <IDOPurchase />
+            </div>
+          </motion.div>
+        )}
+
+        {activeSection === "community" && (
+          <motion.div
+            key="community"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            transition={{ duration: 0.5 }}
+            className="container mx-auto px-4 py-12"
+          >
+            <div className="max-w-6xl mx-auto">
+              <div className="text-center mb-12">
+                <motion.div
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-full px-6 py-3 border border-white/20 mb-6"
+                >
+                  <Users className="w-5 h-5 text-blue-400" />
+                  <span className="text-white font-medium">Community Hub</span>
+                </motion.div>
+                
+                <h2 className="text-4xl font-bold text-white mb-4">Join Our Community</h2>
+                <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+                  Connect with like-minded investors and clean energy enthusiasts
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Users className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Discord Community</h3>
+                  <p className="text-gray-300 mb-4">Join our Discord server for real-time discussions</p>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300"
+                  >
+                    Join Discord
+                  </motion.button>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Twitter className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Twitter Updates</h3>
+                  <p className="text-gray-300 mb-4">Follow us for the latest news and updates</p>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300"
+                  >
+                    Follow Us
+                  </motion.button>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20 text-center">
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Mail className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Newsletter</h3>
+                  <p className="text-gray-300 mb-4">Get weekly updates delivered to your inbox</p>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-300"
+                  >
+                    Subscribe
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
+}
                             onChange={(e) => setPusdAmount(e.target.value)}
                           />
                           <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400">

@@ -51,6 +51,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       current: pathname === "/ido"
     },
     {
+      name: "Invest",
+      href: "/#invest",
+      icon: Zap,
+      current: pathname === "/" && typeof window !== "undefined" && window.location.hash === "#invest"
+    },
+    {
       name: "About",
       href: "/about",
       icon: Globe,
@@ -123,6 +129,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 onClick={() => {
                   if (item.submenu) {
                     setActiveSubmenu(activeSubmenu === item.name ? null : item.name);
+                  } else if (item.name === "Invest") {
+                    // For Invest tab, we'll handle this in the main page
+                    // The link will go to home page and the main page will handle the section switch
                   }
                 }}
                 className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 group ${
@@ -259,6 +268,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                       onClick={() => {
                         if (item.submenu) {
                           setActiveSubmenu(activeSubmenu === item.name ? null : item.name);
+                        } else if (item.name === "Invest") {
+                          // For Invest tab, we'll handle this in the main page
+                          // The link will go to home page and the main page will handle the section switch
+                          onClose();
                         } else {
                           onClose();
                         }

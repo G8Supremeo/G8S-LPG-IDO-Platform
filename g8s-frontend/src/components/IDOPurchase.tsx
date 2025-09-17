@@ -242,14 +242,21 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   // Update messages post-confirmation
   useEffect(() => {
     if (isApprovalSuccess) {
-      setSuccess("Approval confirmed. You can now buy tokens.");
+      setSuccess("✅ Approval confirmed! You can now buy G8S tokens.");
       setWaitingForApproval(false);
+      setError(""); // Clear any previous errors
     }
   }, [isApprovalSuccess]);
 
   useEffect(() => {
     if (isPurchaseSuccess) {
-      setSuccess("Purchase confirmed. G8S tokens will reflect shortly.");
+      setSuccess("🎉 Purchase confirmed! G8S tokens have been added to your wallet.");
+      setError(""); // Clear any previous errors
+      // Reset form after successful purchase
+      setTimeout(() => {
+        setTokenAmount("");
+        setPusdAmount("");
+      }, 3000);
     }
   }, [isPurchaseSuccess]);
 
@@ -329,9 +336,13 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   return (
     <div className="bg-white/10 backdrop-blur-sm rounded-3xl p-8 border border-white/20">
       <div className="text-center mb-8">
-        <div className="inline-flex items-center space-x-2 bg-green-500/20 border border-green-500/30 rounded-full px-4 py-2 mb-4">
-          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-          <span className="text-green-400 text-sm font-medium">LATEST v2.2 - 2333 PUSD = 1 G8S</span>
+        <div className="relative inline-flex items-center space-x-2 bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-green-500/20 border-2 border-green-400/40 rounded-full px-6 py-3 mb-4 shadow-lg shadow-green-500/20">
+          <div className="absolute inset-0 bg-gradient-to-r from-green-400/10 via-emerald-400/10 to-green-400/10 rounded-full animate-pulse"></div>
+          <div className="relative flex items-center space-x-2">
+            <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full animate-pulse shadow-sm shadow-green-400/50"></div>
+            <span className="text-green-300 text-sm font-bold tracking-wide">LATEST v2.3 - 2333 PUSD = 1 G8S</span>
+            <div className="w-1 h-1 bg-green-400 rounded-full animate-ping"></div>
+          </div>
         </div>
         <h2 className="text-3xl font-bold text-white mb-4">Purchase G8S Tokens</h2>
         <p className="text-gray-300">
@@ -481,49 +492,71 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
 
             {/* Action Buttons */}
             <div className="space-y-3">
+              {/* Step 1: Approval Button */}
               {!hasEnoughAllowance && pusdAmount && hasEnoughBalance ? (
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleApprove}
-                  disabled={isApproving || isApprovalPending || pausedBool}
-                  className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
-                >
-                  {isApproving || isApprovalPending ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>{isApprovalPending ? 'Waiting for confirmation...' : 'Approving...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-5 h-5" />
-                      <span>Approve PUSD</span>
-                    </>
-                  )}
-                </motion.button>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2 text-sm text-blue-400">
+                    <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">1</div>
+                    <span>Step 1: Approve PUSD spending</span>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleApprove}
+                    disabled={isApproving || isApprovalPending || pausedBool}
+                    className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
+                  >
+                    {isApproving || isApprovalPending ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>{isApprovalPending ? 'Waiting for confirmation...' : 'Approving...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        <span>Approve PUSD</span>
+                      </>
+                    )}
+                  </motion.button>
+                </div>
               ) : null}
 
+              {/* Step 2: Purchase Button */}
               {hasEnoughAllowance && pusdAmount && hasEnoughBalance ? (
-                <motion.button
-                  whileHover={{ scale: canPurchase ? 1.02 : 1 }}
-                  whileTap={{ scale: canPurchase ? 0.98 : 1 }}
-                  onClick={handlePurchase}
-                  disabled={!canPurchase || isPurchasePending || isApproving || isApprovalPending}
-                  className="w-full px-6 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
-                >
-                  {isPurchasing || isPurchasePending ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span>{isPurchasePending ? 'Waiting for confirmation...' : 'Purchasing...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="w-5 h-5" />
-                      <span>Buy G8S Tokens</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </motion.button>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2 text-sm text-green-400">
+                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">2</div>
+                    <span>Step 2: Buy G8S tokens</span>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: canPurchase ? 1.02 : 1 }}
+                    whileTap={{ scale: canPurchase ? 0.98 : 1 }}
+                    onClick={handlePurchase}
+                    disabled={!canPurchase || isPurchasePending || isApproving || isApprovalPending}
+                    className="w-full px-6 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
+                  >
+                    {isPurchasing || isPurchasePending ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>{isPurchasePending ? 'Waiting for confirmation...' : 'Purchasing...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-5 h-5" />
+                        <span>Buy G8S Tokens</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </motion.button>
+                </div>
+              ) : null}
+
+              {/* Show both buttons when approval is needed but user has balance */}
+              {!hasEnoughAllowance && !hasEnoughBalance && pusdAmount ? (
+                <div className="text-center p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+                  <AlertCircle className="w-5 h-5 text-red-400 mx-auto mb-2" />
+                  <p className="text-red-400 text-sm">Insufficient PUSD balance</p>
+                </div>
               ) : null}
             </div>
 
@@ -546,7 +579,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               </p>
             )}
           </div>
-          <p className="text-center text-xs text-gray-500">Build: IDOPurchase v2.2 - Fixed Display (2333 PUSD = 1 G8S)</p>
+          <p className="text-center text-xs text-gray-500">Build: IDOPurchase v2.3 - Fixed Display & Improved Flow (2333 PUSD = 1 G8S)</p>
         </div>
       )}
     </div>
