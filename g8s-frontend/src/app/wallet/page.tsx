@@ -40,6 +40,7 @@ export default function Wallet() {
   const [sendAddress, setSendAddress] = useState("");
   const [sendToken, setSendToken] = useState("G8S");
   const [showNGN, setShowNGN] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   const ido = useContractAddress(CONTRACTS.IDO_ADDRESS);
   const pusd = useContractAddress(CONTRACTS.PUSD_ADDRESS);
@@ -105,21 +106,13 @@ export default function Wallet() {
   const [realTransactions, setRealTransactions] = useState<RealTx[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
 
-  // Real wallet balances from contracts
+  // Handle client-side mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Real wallet balances from contracts - PUSD first since it's used to buy G8S
   const walletBalances = [
-    {
-      token: "G8S",
-      symbol: "G8S",
-      balance: g8sBalance ? formatUnits(g8sBalance as bigint, 18) : "0",
-      value: g8sBalance ? `$${(Number(formatUnits(g8sBalance as bigint, 18)) * 0.66667).toFixed(2)}` : "$0.00",
-      ngnValue: g8sBalance ? convertToNGN(`$${(Number(formatUnits(g8sBalance as bigint, 18)) * 0.66667).toFixed(2)}`) : "₦0",
-      change: "+12.5%",
-      changeType: "positive",
-      icon: Flame,
-      color: "from-orange-500 to-red-500",
-      contractAddress: g8s,
-      decimals: 18
-    },
     {
       token: "PUSD",
       symbol: "PUSD",
@@ -132,6 +125,19 @@ export default function Wallet() {
       color: "from-green-500 to-emerald-500",
       contractAddress: pusd,
       decimals: typeof pusdDecimals === 'number' ? pusdDecimals : 18
+    },
+    {
+      token: "G8S",
+      symbol: "G8S",
+      balance: g8sBalance ? formatUnits(g8sBalance as bigint, 18) : "0",
+      value: g8sBalance ? `$${(Number(formatUnits(g8sBalance as bigint, 18)) * 0.66667).toFixed(2)}` : "$0.00",
+      ngnValue: g8sBalance ? convertToNGN(`$${(Number(formatUnits(g8sBalance as bigint, 18)) * 0.66667).toFixed(2)}`) : "₦0",
+      change: "+12.5%",
+      changeType: "positive",
+      icon: Flame,
+      color: "from-orange-500 to-red-500",
+      contractAddress: g8s,
+      decimals: 18
     }
   ];
 
@@ -227,10 +233,10 @@ export default function Wallet() {
 
   // Fetch transactions when wallet connects or block number changes
   useEffect(() => {
-    if (address && chain) {
+    if (address && chain && typeof window !== 'undefined') {
       fetchRealTransactions();
     }
-  }, [address, chain, blockNumber]);
+  }, [address, chain]); // Removed blockNumber to prevent infinite loops
 
   const recentTransactions = [
     {
@@ -327,6 +333,15 @@ export default function Wallet() {
       });
     }
   };
+
+  // Show loading state until mounted
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
 
   // Show connection prompt if no wallet is connected
   if (!address) {

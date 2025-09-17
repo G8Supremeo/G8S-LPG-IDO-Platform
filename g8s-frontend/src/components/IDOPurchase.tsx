@@ -4,15 +4,13 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   useAccount, 
-  useBalance, 
   useReadContract, 
   useWriteContract, 
-  useWaitForTransactionReceipt 
+  useWaitForTransactionReceipt,
+  useChainId
 } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { parseEther, parseUnits, formatEther, formatUnits } from "viem";
-import { useChainId, useSwitchChain } from "wagmi";
-import { sepolia } from "wagmi/chains";
+import { parseUnits, formatUnits } from "viem";
 import { 
   Zap, 
   ArrowRight, 
@@ -21,7 +19,8 @@ import {
   Loader2,
   Wallet,
   Coins,
-  Clock
+  Clock,
+  X
 } from "lucide-react";
 import { CONTRACTS, ABI } from "@/lib/contracts";
 
@@ -32,21 +31,54 @@ interface IDOPurchaseProps {
 export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { switchChainAsync } = useSwitchChain();
-  const [tokenAmount, setTokenAmount] = useState("");
   const [pusdAmount, setPusdAmount] = useState("");
   const [isApproving, setIsApproving] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [waitingForApproval, setWaitingForApproval] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [approvalHash, setApprovalHash] = useState<`0x${string}` | undefined>();
   const [purchaseHash, setPurchaseHash] = useState<`0x${string}` | undefined>();
+  const [approvalCompleted, setApprovalCompleted] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [networkStatus, setNetworkStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // Check network status
+  useEffect(() => {
+    const checkNetwork = async () => {
+      try {
+        setNetworkStatus('checking');
+        // Try to read a simple contract call to test network
+        if (chainId) {
+          setNetworkStatus('connected');
+        } else {
+          setNetworkStatus('disconnected');
+        }
+      } catch (error) {
+        console.error('Network check failed:', error);
+        setNetworkStatus('disconnected');
+      }
+    };
+
+    checkNetwork();
+  }, [chainId]);
+
+  // Reset approval state when amount changes
+  useEffect(() => {
+    setApprovalCompleted(false);
+    setError("");
+    setSuccess("");
+    setRetryCount(0);
+    setShowSuccessModal(false);
+  }, [pusdAmount]);
 
   // Contract reads
-  const { data: pusdBalance } = useBalance({
-    address,
-    token: CONTRACTS.PUSD_ADDRESS as `0x${string}`,
+  const { data: pusdBalance } = useReadContract({
+    address: CONTRACTS.PUSD_ADDRESS as `0x${string}`,
+    abi: ABI.ERC20,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address) }
   });
 
   const { data: pusdDecimals } = useReadContract({
@@ -60,6 +92,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     abi: ABI.ERC20,
     functionName: "allowance",
     args: address ? [address, CONTRACTS.IDO_ADDRESS as `0x${string}`] : undefined,
+    query: { enabled: Boolean(address) }
   });
 
   const { data: idoPrice } = useReadContract({
@@ -98,19 +131,6 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     functionName: "endTime",
   });
 
-  // Resolve G8S token address and IDO G8S balance to prevent transfer failures
-  const { data: g8sAddress } = useReadContract({
-    address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
-    abi: ABI.IDO,
-    functionName: "g8sToken",
-  });
-
-  const { data: idoG8sBalance } = useBalance({
-    address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
-    token: (g8sAddress as `0x${string}`) || undefined,
-    query: { enabled: !!g8sAddress },
-  });
-
   // Contract writes
   const { writeContractAsync } = useWriteContract();
 
@@ -123,84 +143,87 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     hash: purchaseHash,
   });
 
-  // Helpers: sanitize number input and format token amounts for display
-  const sanitizeNumberInput = (value: string, maxWhole = 12, maxDecimals = 6) => {
-  // Allow only digits and a single decimal point
-  const v = value.replace(/[^0-9.]/g, "");
-    const parts = v.split('.');
-    if (parts.length > 2) parts.splice(2); // keep only one dot
-    const whole = parts[0].slice(0, maxWhole);
-    const frac = parts[1] ? parts[1].slice(0, maxDecimals) : undefined;
-    return frac !== undefined ? `${whole}.${frac}` : whole;
-  };
-
-  const formatTokenAmountString = (weiValue: bigint | 0n) => {
-    if (!weiValue || weiValue === 0n) return '0';
+  // Get human readable price - IDO price is in PUSD decimals (0)
+  const pricePerG8S = (() => {
+    if (!idoPrice) return 0;
     try {
-      // formatUnits returns a decimal string with token decimals (G8S uses 18)
-      const s = formatUnits(weiValue, 18);
-      if (!s.includes('.')) return Number(s).toLocaleString();
-      const [intPart, fracPart] = s.split('.');
-      const trimmedFrac = fracPart.replace(/0+$/, '').slice(0, 6); // max 6 decimals
-      const intFormatted = Number(intPart).toLocaleString();
-      return trimmedFrac ? `${intFormatted}.${trimmedFrac}` : intFormatted;
+      // IDO price is stored with 0 decimals (raw value)
+      return Number(idoPrice as bigint);
     } catch {
-      return '0';
+      return 0;
     }
-  };
+  })();
 
-  // Calculate PUSD amount when token amount changes
-  useEffect(() => {
-    if (tokenAmount && idoPrice) {
-      const tokens = parseFloat(tokenAmount || '0');
-      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 18;
-      const price = Number(formatUnits(idoPrice as bigint, decimals));
-      const pusd = tokens * price;
-      setPusdAmount(pusd.toFixed(Math.min(6, decimals)));
-    } else {
-      setPusdAmount("");
+  // Calculate G8S tokens from PUSD amount
+  const g8sTokens = (() => {
+    if (!pusdAmount || !pricePerG8S) return "0";
+    
+    try {
+      const pusdNum = parseFloat(pusdAmount);
+      
+      // Calculate G8S tokens: PUSD amount / price per G8S
+      const g8sAmount = pusdNum / pricePerG8S;
+      
+      return g8sAmount.toFixed(6).replace(/\.?0+$/, '');
+    } catch {
+      return "0";
     }
-  }, [tokenAmount, idoPrice, pusdDecimals]);
+  })();
 
-  // Calculate token amount when PUSD amount changes
-  useEffect(() => {
-    if (pusdAmount && idoPrice) {
-      const pusd = parseFloat(pusdAmount || '0');
-      const decimals = typeof pusdDecimals === 'number' ? (pusdDecimals as number) : 18;
-      const price = Number(formatUnits(idoPrice as bigint, decimals));
-      const tokens = price > 0 ? pusd / price : 0;
-      setTokenAmount(tokens.toFixed(2));
-    } else {
-      setTokenAmount("");
-    }
-  }, [pusdAmount, idoPrice, pusdDecimals]);
+  const hasEnoughBalance = pusdBalance && pusdAmount 
+    ? Number(pusdBalance as bigint) >= parseFloat(pusdAmount)
+    : false;
+
+  // Force approval for every transaction - don't check existing allowance
+  const hasEnoughAllowance = false; // Always require fresh approval
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const withinWindow = saleStart && saleEnd ? (Number(saleStart) <= nowSec && nowSec <= Number(saleEnd)) : true;
+  const pausedBool = isPaused === true;
+  const saleActive = !pausedBool && withinWindow;
 
   const handleApprove = async () => {
     if (!address || !pusdAmount) return;
 
     setIsApproving(true);
-    setWaitingForApproval(true);
     setError("");
 
     try {
-      if (chainId !== sepolia.id) {
-        await switchChainAsync({ chainId: sepolia.id });
-      }
-      const decimals = typeof pusdDecimals === 'number' ? pusdDecimals : 0;
-      const amount = parseUnits(pusdAmount, decimals);
+      // PUSD has 0 decimals, so we use the raw amount
+      const amount = BigInt(Math.floor(parseFloat(pusdAmount)));
+      
+      console.log('Approval details:', {
+        pusdAddress: CONTRACTS.PUSD_ADDRESS,
+        idoAddress: CONTRACTS.IDO_ADDRESS,
+        amount: amount.toString(),
+        userAddress: address
+      });
+      
       const hash = await writeContractAsync({
         address: CONTRACTS.PUSD_ADDRESS as `0x${string}`,
         abi: ABI.ERC20,
         functionName: "approve",
         args: [CONTRACTS.IDO_ADDRESS as `0x${string}`, amount],
+        gas: 100000n, // Set explicit gas limit
+        gasPrice: undefined, // Let viem estimate
       });
 
       setApprovalHash(hash);
       setSuccess("Approval transaction sent. Confirming...");
     } catch (err: unknown) {
+      console.error('Approval error:', err);
       const message = err instanceof Error ? err.message : 'Failed to approve PUSD tokens';
-      setError(message);
-      setWaitingForApproval(false);
+      
+      // More specific error handling
+      if (message.includes('RetryOnEmptyMiddleware')) {
+        setError(`Network error: Please check your internet connection and try again. If the problem persists, try switching to a different RPC endpoint.`);
+      } else if (message.includes('insufficient funds')) {
+        setError(`Insufficient funds: You need ETH for gas fees. Please add ETH to your wallet.`);
+      } else if (message.includes('user rejected')) {
+        setError(`Transaction rejected: Please approve the transaction in MetaMask.`);
+      } else {
+        setError(`Approval failed: ${message}. Please try again.`);
+      }
     } finally {
       setIsApproving(false);
     }
@@ -213,27 +236,24 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
     setError("");
 
     try {
-      if (chainId !== sepolia.id) {
-        await switchChainAsync({ chainId: sepolia.id });
-      }
-      const decimals = typeof pusdDecimals === 'number' ? pusdDecimals : 0;
-      const amount = parseUnits(pusdAmount, decimals);
-      if (!hasEnoughAllowance) {
-        throw new Error('Please approve PUSD first.');
-      }
+      // PUSD has 0 decimals, so we use the raw amount
+      const amount = BigInt(Math.floor(parseFloat(pusdAmount)));
+      
       const hash = await writeContractAsync({
         address: CONTRACTS.IDO_ADDRESS as `0x${string}`,
         abi: ABI.IDO,
         functionName: "buyWithPUSD",
         args: [amount],
+        gas: 200000n, // Set explicit gas limit
       });
 
       setPurchaseHash(hash);
       setSuccess("Purchase transaction sent. Confirming...");
       onPurchaseSuccess?.();
     } catch (err: unknown) {
+      console.error('Purchase error:', err);
       const message = err instanceof Error ? err.message : 'Failed to purchase tokens';
-      setError(message);
+      setError(`Purchase failed: ${message}. Please try again or check your network connection.`);
     } finally {
       setIsPurchasing(false);
     }
@@ -243,91 +263,19 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
   useEffect(() => {
     if (isApprovalSuccess) {
       setSuccess("✅ Approval confirmed! You can now buy G8S tokens.");
-      setWaitingForApproval(false);
-      setError(""); // Clear any previous errors
+      setError("");
+      setApprovalCompleted(true);
     }
   }, [isApprovalSuccess]);
 
   useEffect(() => {
     if (isPurchaseSuccess) {
       setSuccess("🎉 Purchase confirmed! G8S tokens have been added to your wallet.");
-      setError(""); // Clear any previous errors
-      // Reset form after successful purchase
-      setTimeout(() => {
-        setTokenAmount("");
-        setPusdAmount("");
-      }, 3000);
+      setError("");
+      setShowSuccessModal(true);
+      // Don't auto-reset - let user close modal manually
     }
   }, [isPurchaseSuccess]);
-
-  const decimalsLoaded = typeof pusdDecimals === 'number';
-  const decimalsNum = decimalsLoaded ? (pusdDecimals as number) : 18;
-
-  // Derived pricing and tokens-out for display (human-friendly)
-  const priceNum = typeof idoPrice === 'bigint' ? Number(formatUnits(idoPrice as bigint, decimalsNum)) : undefined;
-  let computedTokensOutWei: bigint = 0n;
-  try {
-    if (pusdAmount && typeof idoPrice === 'bigint') {
-      const amount = parseUnits(pusdAmount, decimalsNum);
-      const ONE = 1000000000000000000n;
-      computedTokensOutWei = (amount * ONE) / (idoPrice as bigint);
-    }
-  } catch {}
-
-  // Simple human-readable calculation
-  const computedTokensOutHuman = (() => {
-    if (!pusdAmount) return '0';
-    const pusdNum = parseFloat(pusdAmount || '0');
-    const tokensFloat = pusdNum / 2333; // 2333 PUSD per G8S
-    return tokensFloat.toFixed(6).replace(/\.?0+$/, ''); // Remove trailing zeros
-  })();
-
-  const hasEnoughBalance = pusdBalance && pusdAmount 
-    ? Number(formatUnits(pusdBalance.value, pusdBalance.decimals)) >= parseFloat(pusdAmount)
-    : false;
-
-  const hasEnoughAllowance = !waitingForApproval && pusdAllowance && pusdAmount
-    ? Number(formatUnits(pusdAllowance as bigint, decimalsNum)) >= parseFloat(pusdAmount)
-    : false;
-
-  const nowSec = Math.floor(Date.now() / 1000);
-  const withinWindow = saleStart && saleEnd ? (Number(saleStart) <= nowSec && nowSec <= Number(saleEnd)) : true;
-  const pausedBool = isPaused === true;
-  const saleActive = !pausedBool && withinWindow;
-
-  // Pre-check cap based on entered PUSD
-  let exceedsCap = false;
-  let exceedsIdoBalance = false;
-  try {
-    if (pusdAmount && idoPrice && tokensSold && tokensForSale) {
-      const amountWei = parseUnits(pusdAmount, decimalsNum);
-      const ONE = 1000000000000000000n;
-      const tokensOut = (amountWei * ONE) / (idoPrice as bigint);
-      const sold = tokensSold as bigint;
-      const cap = tokensForSale as bigint;
-      exceedsCap = (sold + tokensOut) > cap;
-
-      if (idoG8sBalance && typeof idoG8sBalance.value === 'bigint') {
-        exceedsIdoBalance = tokensOut > (idoG8sBalance.value as bigint);
-      }
-    }
-  } catch (_) {
-    // ignore precheck errors
-  }
-
-  const canPurchase = isConnected && 
-    pusdAmount && 
-    tokenAmount && 
-    hasEnoughBalance && 
-    hasEnoughAllowance && 
-    saleActive &&
-    decimalsLoaded &&
-    !exceedsIdoBalance &&
-    !exceedsCap &&
-    !isApproving && 
-    !isPurchasing &&
-    !isApprovalPending &&
-    !waitingForApproval;
 
   const progressPercentage = tokensSold && tokensForSale
     ? (Number(tokensSold) / Number(tokensForSale)) * 100
@@ -340,7 +288,7 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
           <div className="absolute inset-0 bg-gradient-to-r from-green-400/10 via-emerald-400/10 to-green-400/10 rounded-full animate-pulse"></div>
           <div className="relative flex items-center space-x-2">
             <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full animate-pulse shadow-sm shadow-green-400/50"></div>
-            <span className="text-green-300 text-sm font-bold tracking-wide">LATEST v2.3 - 2333 PUSD = 1 G8S</span>
+            <span className="text-green-300 text-sm font-bold tracking-wide">LATEST v2.4 - Smart Contract Price</span>
             <div className="w-1 h-1 bg-green-400 rounded-full animate-ping"></div>
           </div>
         </div>
@@ -362,6 +310,23 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Network Status */}
+          <div className="text-center">
+            <div className="inline-flex items-center space-x-2 bg-blue-500/20 border border-blue-500/30 rounded-full px-4 py-2">
+              <div className={`w-2 h-2 rounded-full ${
+                networkStatus === 'connected' ? 'bg-green-400 animate-pulse' :
+                networkStatus === 'disconnected' ? 'bg-red-400' : 'bg-yellow-400 animate-pulse'
+              }`}></div>
+              <span className={`text-sm font-medium ${
+                networkStatus === 'connected' ? 'text-green-400' :
+                networkStatus === 'disconnected' ? 'text-red-400' : 'text-yellow-400'
+              }`}>
+                {networkStatus === 'connected' ? 'Network Connected' :
+                 networkStatus === 'disconnected' ? 'Network Disconnected' : 'Checking Network...'}
+              </span>
+            </div>
+          </div>
+
           {/* Sale Status */}
           <div className="bg-white/5 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
@@ -378,13 +343,13 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-300">Tokens Sold</span>
                 <span className="text-white">
-                  {typeof tokensSold === 'bigint' ? formatEther(tokensSold as bigint) : "0"} G8S
+                  {typeof tokensSold === 'bigint' ? formatUnits(tokensSold as bigint, 18) : "0"} G8S
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-300">Total Supply</span>
                 <span className="text-white">
-                  {typeof tokensForSale === 'bigint' ? formatEther(tokensForSale as bigint) : "0"} G8S
+                  {typeof tokensForSale === 'bigint' ? formatUnits(tokensForSale as bigint, 18) : "0"} G8S
                 </span>
               </div>
               <div className="w-full bg-gray-700/50 rounded-full h-3">
@@ -411,13 +376,13 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               <div className="flex justify-between">
                 <span className="text-gray-300">PUSD Balance</span>
                 <span className="text-white font-semibold">
-                  {pusdBalance ? formatUnits(pusdBalance.value, pusdBalance.decimals) : "0"} PUSD
+                  {pusdBalance ? Number(pusdBalance as bigint).toLocaleString() : "0"} PUSD
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">Allowance</span>
                 <span className="text-white font-semibold">
-                  {pusdAllowance ? formatUnits(pusdAllowance as bigint, decimalsNum) : "0"} PUSD
+                  {pusdAllowance ? Number(pusdAllowance as bigint).toLocaleString() : "0"} PUSD
                 </span>
               </div>
             </div>
@@ -427,43 +392,26 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Amount of G8S Tokens
-              </label>
-              <input
-                type="text"
-                value={tokenAmount}
-                onChange={(e) => setTokenAmount(sanitizeNumberInput(e.target.value, 8, 4))}
-                placeholder="Enter amount"
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
-                inputMode="decimal"
-                disabled={pausedBool}
-                maxLength={13}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
                 PUSD Amount
               </label>
               <input
                 type="text"
                 value={pusdAmount}
-                onChange={(e) => setPusdAmount(sanitizeNumberInput(e.target.value, 10, decimalsNum === 0 ? 0 : 6))}
+                onChange={(e) => setPusdAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                 placeholder="Enter PUSD amount"
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-orange-400"
                 inputMode="numeric"
                 disabled={pausedBool}
-                maxLength={16}
               />
             </div>
 
             <div className="text-center text-sm text-gray-400">
-              Price: 2333 PUSD per G8S token
+              Price: {pricePerG8S > 0 ? `${pricePerG8S.toFixed(0)} PUSD per G8S token` : 'Loading price...'}
             </div>
 
-            {pusdAmount && (
+            {pusdAmount && g8sTokens !== "0" && (
               <div className="text-center text-sm text-gray-300">
-                You will receive (est.): <span className="text-white font-semibold">{computedTokensOutHuman}</span> G8S
+                You will receive: <span className="text-white font-semibold">{g8sTokens}</span> G8S
               </div>
             )}
 
@@ -472,28 +420,33 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center space-x-2 p-3 bg-red-500/20 border border-red-500/30 rounded-xl"
+                className="flex items-center justify-between p-3 bg-red-500/20 border border-red-500/30 rounded-xl"
               >
-                <AlertCircle className="w-5 h-5 text-red-400" />
-                <span className="text-red-400 text-sm">{error}</span>
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="w-5 h-5 text-red-400" />
+                  <span className="text-red-400 text-sm">{error}</span>
+                </div>
+                {error.includes('Network error') && retryCount < 3 && (
+                  <button
+                    onClick={() => {
+                      setRetryCount(prev => prev + 1);
+                      setError("");
+                      setSuccess("");
+                    }}
+                    className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded"
+                  >
+                    Retry
+                  </button>
+                )}
               </motion.div>
             )}
 
-            {success && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center space-x-2 p-3 bg-green-500/20 border border-green-500/30 rounded-xl"
-              >
-                <CheckCircle className="w-5 h-5 text-green-400" />
-                <span className="text-green-400 text-sm">{success}</span>
-              </motion.div>
-            )}
+            {/* Success message now shown in modal */}
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              {/* Step 1: Approval Button */}
-              {!hasEnoughAllowance && pusdAmount && hasEnoughBalance ? (
+              {/* Step 1: Approval Button - Always show first */}
+              {!approvalCompleted && pusdAmount && hasEnoughBalance ? (
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2 text-sm text-blue-400">
                     <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">1</div>
@@ -521,18 +474,18 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 </div>
               ) : null}
 
-              {/* Step 2: Purchase Button */}
-              {hasEnoughAllowance && pusdAmount && hasEnoughBalance ? (
+              {/* Step 2: Purchase Button - Show after approval */}
+              {approvalCompleted && pusdAmount && hasEnoughBalance ? (
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2 text-sm text-green-400">
                     <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">2</div>
                     <span>Step 2: Buy G8S tokens</span>
                   </div>
                   <motion.button
-                    whileHover={{ scale: canPurchase ? 1.02 : 1 }}
-                    whileTap={{ scale: canPurchase ? 0.98 : 1 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={handlePurchase}
-                    disabled={!canPurchase || isPurchasePending || isApproving || isApprovalPending}
+                    disabled={!saleActive || isPurchasePending || isApproving || isApprovalPending}
                     className="w-full px-6 py-4 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
                   >
                     {isPurchasing || isPurchasePending ? (
@@ -551,35 +504,113 @@ export default function IDOPurchase({ onPurchaseSuccess }: IDOPurchaseProps) {
                 </div>
               ) : null}
 
-              {/* Show both buttons when approval is needed but user has balance */}
-              {!hasEnoughAllowance && !hasEnoughBalance && pusdAmount ? (
-                <div className="text-center p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <AlertCircle className="w-5 h-5 text-red-400 mx-auto mb-2" />
-                  <p className="text-red-400 text-sm">Insufficient PUSD balance</p>
-                </div>
-              ) : null}
+              {/* Validation Messages */}
+              {pusdAmount && !hasEnoughBalance && (
+                <p className="text-red-400 text-sm text-center">
+                  Insufficient PUSD balance
+                </p>
+              )}
+
+              {!saleActive && (
+                <p className="text-yellow-400 text-sm text-center">
+                  Sale is not active (paused or outside start/end time)
+                </p>
+              )}
             </div>
-
-            {/* Validation Messages */}
-            {pusdAmount && !hasEnoughBalance && (
-              <p className="text-red-400 text-sm text-center">
-                Insufficient PUSD balance
-              </p>
-            )}
-
-            {!saleActive && (
-              <p className="text-yellow-400 text-sm text-center">
-                Sale is not active (paused or outside start/end time)
-              </p>
-            )}
-
-            {exceedsCap && (
-              <p className="text-red-400 text-sm text-center">
-                Purchase exceeds remaining IDO allocation
-              </p>
-            )}
           </div>
-          <p className="text-center text-xs text-gray-500">Build: IDOPurchase v2.3 - Fixed Display & Improved Flow (2333 PUSD = 1 G8S)</p>
+          <p className="text-center text-xs text-gray-500">Build: IDOPurchase v2.4 - Smart Contract Integration</p>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="bg-gradient-to-br from-green-900/90 to-emerald-900/90 backdrop-blur-xl border border-green-500/30 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl"
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setShowSuccessModal(false);
+                setPusdAmount("");
+                setApprovalCompleted(false);
+                setSuccess("");
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            {/* Success Content */}
+            <div className="text-center">
+              {/* Success Icon */}
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-green-400/30"
+              >
+                <CheckCircle className="w-12 h-12 text-green-400" />
+              </motion.div>
+
+              {/* Success Title */}
+              <motion.h3
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="text-2xl font-bold text-white mb-4"
+              >
+                🎉 Purchase Successful!
+              </motion.h3>
+
+              {/* Success Message */}
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="text-green-300 text-lg mb-6 leading-relaxed"
+              >
+                Your G8S tokens have been successfully added to your wallet!
+              </motion.p>
+
+              {/* Transaction Details */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10"
+              >
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-300">Amount Purchased:</span>
+                  <span className="text-white font-semibold">{g8sTokens} G8S</span>
+                </div>
+                <div className="flex justify-between items-center text-sm mt-2">
+                  <span className="text-gray-300">PUSD Spent:</span>
+                  <span className="text-white font-semibold">{pusdAmount} PUSD</span>
+                </div>
+              </motion.div>
+
+              {/* Close Button */}
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setPusdAmount("");
+                  setApprovalCompleted(false);
+                  setSuccess("");
+                }}
+                className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center justify-center space-x-2"
+              >
+                <CheckCircle className="w-5 h-5" />
+                <span>Continue</span>
+              </motion.button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

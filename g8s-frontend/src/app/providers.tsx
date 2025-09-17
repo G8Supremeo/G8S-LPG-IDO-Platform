@@ -6,10 +6,17 @@ import { sepolia } from "wagmi/chains";
 import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { http } from "viem";
+import { http, fallback } from "viem";
 import "../lib/errorHandler";
 
-const DEFAULT_SEPOLIA_RPC = "https://sepolia.drpc.org";
+// Multiple RPC endpoints for better reliability
+const SEPOLIA_RPCS = [
+  "https://sepolia.drpc.org",
+  "https://rpc.sepolia.org",
+  "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161",
+  "https://ethereum-sepolia.publicnode.com",
+  "https://sepolia.gateway.tenderly.co",
+];
 
 // Suppress Coinbase Wallet SDK console errors in development
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
@@ -30,12 +37,24 @@ let config: ReturnType<typeof getDefaultConfig> | null = null;
 
 const getConfig = () => {
   if (!config) {
+    // Create fallback transport with multiple RPC endpoints
+    const transport = fallback(
+      SEPOLIA_RPCS.map(rpc => http(rpc)),
+      {
+        rank: false, // Don't rank by response time
+        retryCount: 3, // Retry up to 3 times
+        retryDelay: 1000, // 1 second delay between retries
+      }
+    );
+
     config = getDefaultConfig({
       appName: "G8S_LPG IDO",
       projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || "demo",
       chains: [sepolia],
       transports: {
-        [sepolia.id]: http(process.env.NEXT_PUBLIC_RPC_URL_SEPOLIA || DEFAULT_SEPOLIA_RPC),
+        [sepolia.id]: process.env.NEXT_PUBLIC_RPC_URL_SEPOLIA 
+          ? http(process.env.NEXT_PUBLIC_RPC_URL_SEPOLIA)
+          : transport,
       },
     });
   }

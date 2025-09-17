@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import {
   Settings,
-  User,
+  Wallet,
   Bell,
   Shield,
   Globe,
@@ -16,75 +16,105 @@ import {
   Eye,
   EyeOff,
   Save,
-  Trash2,
   Download,
-  Upload,
   Key,
   Smartphone,
   Mail,
   MessageSquare,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  User,
+  CreditCard,
+  Network,
+  Database
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState("profile");
+  const [activeTab, setActiveTab] = useState("wallet");
+  const [mounted, setMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Wallet Settings
+  const [walletSettings, setWalletSettings] = useState({
+    showBalances: true,
+    showNGN: true,
+    autoRefresh: true,
+    confirmTransactions: true
+  });
+
+  // Notification Settings
   const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    sms: false,
-    marketing: false
+    purchaseAlerts: true,
+    priceAlerts: true,
+    transactionUpdates: true,
+    marketingEmails: false
   });
-  const [privacy, setPrivacy] = useState({
-    profileVisibility: "public",
-    showBalance: true,
-    allowMessages: true
+
+  // Display Settings
+  const [displaySettings, setDisplaySettings] = useState({
+    theme: "dark",
+    currency: "USD",
+    language: "en",
+    compactMode: false
   });
-  const [theme, setTheme] = useState("dark");
-  const [profile, setProfile] = useState({
-    displayName: "G8S Investor",
-    email: "investor@g8s-lpg.com",
-    bio: ""
+
+  // Security Settings
+  const [securitySettings, setSecuritySettings] = useState({
+    twoFactor: false,
+    sessionTimeout: 30,
+    autoLock: true
   });
+
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  // Handle client-side mounting
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Load settings from localStorage on mount
   useEffect(() => {
-    const savedSettings = localStorage.getItem("g8s-settings");
-    if (savedSettings) {
-      try {
-        const settings = JSON.parse(savedSettings);
-        if (settings.notifications) setNotifications(settings.notifications);
-        if (settings.privacy) setPrivacy(settings.privacy);
-        if (settings.theme) setTheme(settings.theme);
-        if (settings.profile) setProfile(settings.profile);
-      } catch (error) {
-        console.error("Error loading settings:", error);
+    if (typeof window !== 'undefined' && mounted) {
+      const savedSettings = localStorage.getItem("g8s-settings");
+      if (savedSettings) {
+        try {
+          const settings = JSON.parse(savedSettings);
+          if (settings.wallet) setWalletSettings(settings.wallet);
+          if (settings.notifications) setNotifications(settings.notifications);
+          if (settings.display) setDisplaySettings(settings.display);
+          if (settings.security) setSecuritySettings(settings.security);
+        } catch (error) {
+          console.error("Error loading settings:", error);
+        }
       }
     }
-  }, []);
+  }, [mounted]);
 
   // Save settings to localStorage
-  const saveSettings = async () => {
+  const saveSettings = () => {
     setSaveStatus("saving");
     try {
-      const settings = {
-        notifications,
-        privacy,
-        theme,
-        profile
-      };
-      localStorage.setItem("g8s-settings", JSON.stringify(settings));
-      
-      // Apply theme
-      document.documentElement.setAttribute("data-theme", theme);
+      if (typeof window !== 'undefined' && mounted) {
+        const settings = {
+          wallet: walletSettings,
+          notifications,
+          display: displaySettings,
+          security: securitySettings
+        };
+        localStorage.setItem("g8s-settings", JSON.stringify(settings));
+        
+        // Apply theme
+        if (document.documentElement) {
+          document.documentElement.setAttribute("data-theme", displaySettings.theme);
+        }
+      }
       
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (error) {
+      console.error("Error saving settings:", error);
       setSaveStatus("error");
       setTimeout(() => setSaveStatus("idle"), 2000);
     }
@@ -92,10 +122,10 @@ export default function Settings() {
 
   const exportData = () => {
     const data = {
+      wallet: walletSettings,
       notifications,
-      privacy,
-      theme,
-      profile,
+      display: displaySettings,
+      security: securitySettings,
       exportDate: new Date().toISOString()
     };
     
@@ -109,19 +139,33 @@ export default function Settings() {
   };
 
   const tabs = [
-    { id: "profile", label: "Profile", icon: User },
+    { id: "wallet", label: "Wallet", icon: Wallet },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "privacy", label: "Privacy", icon: Shield },
-    { id: "appearance", label: "Appearance", icon: Palette },
-    { id: "security", label: "Security", icon: Lock },
-    { id: "preferences", label: "Preferences", icon: Settings }
+    { id: "display", label: "Display", icon: Palette },
+    { id: "security", label: "Security", icon: Shield },
+    { id: "network", label: "Network", icon: Network }
   ];
 
   const themes = [
-    { id: "light", name: "Light", icon: Sun, gradient: "from-blue-50 to-cyan-50" },
     { id: "dark", name: "Dark", icon: Moon, gradient: "from-slate-900 to-gray-900" },
+    { id: "light", name: "Light", icon: Sun, gradient: "from-blue-50 to-cyan-50" },
     { id: "lpg", name: "LPG", icon: Flame, gradient: "from-blue-900 via-cyan-900 to-blue-900" }
   ];
+
+  const currencies = [
+    { id: "USD", name: "US Dollar", symbol: "$" },
+    { id: "NGN", name: "Nigerian Naira", symbol: "₦" },
+    { id: "EUR", name: "Euro", symbol: "€" }
+  ];
+
+  // Show loading state until mounted
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
@@ -141,8 +185,52 @@ export default function Settings() {
           transition={{ duration: 0.6 }}
           className="mb-8"
         >
-          <h1 className="text-4xl font-bold text-white mb-2">Settings</h1>
-          <p className="text-gray-300">Customize your G8S LPG experience</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">Settings</h1>
+              <p className="text-gray-300">Configure your G8S LPG IDO experience</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={exportData}
+                className="px-4 py-2 bg-white/10 border border-white/20 rounded-xl text-white hover:bg-white/20 transition-colors flex items-center space-x-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export</span>
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={saveSettings}
+                disabled={saveStatus === "saving"}
+                className="px-6 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold rounded-xl transition-all duration-300 flex items-center space-x-2"
+              >
+                {saveStatus === "saving" ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : saveStatus === "saved" ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Saved!</span>
+                  </>
+                ) : saveStatus === "error" ? (
+                  <>
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Error</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Save</span>
+                  </>
+                )}
+              </motion.button>
+            </div>
+          </div>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -180,105 +268,28 @@ export default function Settings() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="lg:col-span-3"
           >
-            {activeTab === "profile" && (
+            {/* Wallet Settings */}
+            {activeTab === "wallet" && (
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <h2 className="text-2xl font-bold text-white mb-6">Profile Settings</h2>
-                <div className="space-y-6">
-                  <div className="flex items-center space-x-6">
-                    <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center">
-                      <User className="w-10 h-10 text-white" />
-                    </div>
-                    <div>
-                      <button className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white hover:bg-white/20 transition-colors">
-                        Change Avatar
-                      </button>
-                      <p className="text-sm text-gray-400 mt-1">JPG, PNG or GIF. Max size 2MB.</p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Display Name</label>
-                      <input
-                        type="text"
-                        value={profile.displayName}
-                        onChange={(e) => setProfile({...profile, displayName: e.target.value})}
-                        className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:border-blue-400 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
-                      <input
-                        type="email"
-                        value={profile.email}
-                        onChange={(e) => setProfile({...profile, email: e.target.value})}
-                        className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:border-blue-400 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Bio</label>
-                    <textarea
-                      rows={4}
-                      placeholder="Tell us about yourself..."
-                      value={profile.bio}
-                      onChange={(e) => setProfile({...profile, bio: e.target.value})}
-                      className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:border-blue-400 focus:outline-none"
-                    />
-                  </div>
-                  
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={saveSettings}
-                    disabled={saveStatus === "saving"}
-                    className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 flex items-center space-x-2"
-                  >
-                    {saveStatus === "saving" ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Saving...</span>
-                      </>
-                    ) : saveStatus === "saved" ? (
-                      <>
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Saved!</span>
-                      </>
-                    ) : saveStatus === "error" ? (
-                      <>
-                        <AlertCircle className="w-4 h-4" />
-                        <span>Error</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        <span>Save Changes</span>
-                      </>
-                    )}
-                  </motion.button>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "notifications" && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <h2 className="text-2xl font-bold text-white mb-6">Notification Preferences</h2>
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
+                  <Wallet className="w-6 h-6" />
+                  <span>Wallet Settings</span>
+                </h2>
                 <div className="space-y-6">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
                       <div className="flex items-center space-x-3">
-                        <Mail className="w-5 h-5 text-blue-400" />
+                        <Eye className="w-5 h-5 text-blue-400" />
                         <div>
-                          <h3 className="text-white font-medium">Email Notifications</h3>
-                          <p className="text-sm text-gray-400">Receive updates via email</p>
+                          <h3 className="text-white font-medium">Show Token Balances</h3>
+                          <p className="text-sm text-gray-400">Display your PUSD and G8S balances</p>
                         </div>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={notifications.email}
-                          onChange={(e) => setNotifications({...notifications, email: e.target.checked})}
+                          checked={walletSettings.showBalances}
+                          onChange={(e) => setWalletSettings({...walletSettings, showBalances: e.target.checked})}
                           className="sr-only peer"
                         />
                         <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -287,17 +298,17 @@ export default function Settings() {
                     
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
                       <div className="flex items-center space-x-3">
-                        <Smartphone className="w-5 h-5 text-green-400" />
+                        <CreditCard className="w-5 h-5 text-green-400" />
                         <div>
-                          <h3 className="text-white font-medium">Push Notifications</h3>
-                          <p className="text-sm text-gray-400">Receive push notifications on your device</p>
+                          <h3 className="text-white font-medium">Show NGN Values</h3>
+                          <p className="text-sm text-gray-400">Display Nigerian Naira equivalent values</p>
                         </div>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={notifications.push}
-                          onChange={(e) => setNotifications({...notifications, push: e.target.checked})}
+                          checked={walletSettings.showNGN}
+                          onChange={(e) => setWalletSettings({...walletSettings, showNGN: e.target.checked})}
                           className="sr-only peer"
                         />
                         <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -306,17 +317,17 @@ export default function Settings() {
                     
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
                       <div className="flex items-center space-x-3">
-                        <MessageSquare className="w-5 h-5 text-purple-400" />
+                        <Database className="w-5 h-5 text-purple-400" />
                         <div>
-                          <h3 className="text-white font-medium">SMS Notifications</h3>
-                          <p className="text-sm text-gray-400">Receive text message alerts</p>
+                          <h3 className="text-white font-medium">Auto Refresh Balances</h3>
+                          <p className="text-sm text-gray-400">Automatically update wallet balances</p>
                         </div>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={notifications.sms}
-                          onChange={(e) => setNotifications({...notifications, sms: e.target.checked})}
+                          checked={walletSettings.autoRefresh}
+                          onChange={(e) => setWalletSettings({...walletSettings, autoRefresh: e.target.checked})}
                           className="sr-only peer"
                         />
                         <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -325,17 +336,106 @@ export default function Settings() {
                     
                     <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
                       <div className="flex items-center space-x-3">
-                        <Bell className="w-5 h-5 text-orange-400" />
+                        <Shield className="w-5 h-5 text-orange-400" />
                         <div>
-                          <h3 className="text-white font-medium">Marketing Updates</h3>
+                          <h3 className="text-white font-medium">Confirm Transactions</h3>
+                          <p className="text-sm text-gray-400">Require confirmation for all transactions</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={walletSettings.confirmTransactions}
+                          onChange={(e) => setWalletSettings({...walletSettings, confirmTransactions: e.target.checked})}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Notification Settings */}
+            {activeTab === "notifications" && (
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
+                  <Bell className="w-6 h-6" />
+                  <span>Notification Settings</span>
+                </h2>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                        <div>
+                          <h3 className="text-white font-medium">Purchase Alerts</h3>
+                          <p className="text-sm text-gray-400">Get notified when G8S token purchases complete</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={notifications.purchaseAlerts}
+                          onChange={(e) => setNotifications({...notifications, purchaseAlerts: e.target.checked})}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <Flame className="w-5 h-5 text-orange-400" />
+                        <div>
+                          <h3 className="text-white font-medium">Price Alerts</h3>
+                          <p className="text-sm text-gray-400">Get notified about G8S token price changes</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={notifications.priceAlerts}
+                          onChange={(e) => setNotifications({...notifications, priceAlerts: e.target.checked})}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <Database className="w-5 h-5 text-blue-400" />
+                        <div>
+                          <h3 className="text-white font-medium">Transaction Updates</h3>
+                          <p className="text-sm text-gray-400">Get notified about transaction status changes</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={notifications.transactionUpdates}
+                          onChange={(e) => setNotifications({...notifications, transactionUpdates: e.target.checked})}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <Mail className="w-5 h-5 text-purple-400" />
+                        <div>
+                          <h3 className="text-white font-medium">Marketing Emails</h3>
                           <p className="text-sm text-gray-400">Receive promotional content and updates</p>
                         </div>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={notifications.marketing}
-                          onChange={(e) => setNotifications({...notifications, marketing: e.target.checked})}
+                          checked={notifications.marketingEmails}
+                          onChange={(e) => setNotifications({...notifications, marketingEmails: e.target.checked})}
                           className="sr-only peer"
                         />
                         <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -346,9 +446,13 @@ export default function Settings() {
               </div>
             )}
 
-            {activeTab === "appearance" && (
+            {/* Display Settings */}
+            {activeTab === "display" && (
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <h2 className="text-2xl font-bold text-white mb-6">Appearance Settings</h2>
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
+                  <Palette className="w-6 h-6" />
+                  <span>Display Settings</span>
+                </h2>
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-white mb-4">Theme</h3>
@@ -356,9 +460,9 @@ export default function Settings() {
                       {themes.map((themeOption) => (
                         <button
                           key={themeOption.id}
-                          onClick={() => setTheme(themeOption.id)}
+                          onClick={() => setDisplaySettings({...displaySettings, theme: themeOption.id})}
                           className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                            theme === themeOption.id
+                            displaySettings.theme === themeOption.id
                               ? "border-blue-400 bg-blue-500/20"
                               : "border-white/20 bg-white/5 hover:border-white/40"
                           }`}
@@ -373,22 +477,105 @@ export default function Settings() {
                   </div>
                   
                   <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Display Options</h3>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                    <h3 className="text-lg font-semibold text-white mb-4">Default Currency</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {currencies.map((currency) => (
+                        <button
+                          key={currency.id}
+                          onClick={() => setDisplaySettings({...displaySettings, currency: currency.id})}
+                          className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+                            displaySettings.currency === currency.id
+                              ? "border-blue-400 bg-blue-500/20"
+                              : "border-white/20 bg-white/5 hover:border-white/40"
+                          }`}
+                        >
+                          <div className="text-2xl font-bold text-white mb-2">{currency.symbol}</div>
+                          <p className="text-white font-medium">{currency.name}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div>
+                        <h4 className="text-white font-medium">Compact Mode</h4>
+                        <p className="text-sm text-gray-400">Use smaller spacing and components</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={displaySettings.compactMode}
+                          onChange={(e) => setDisplaySettings({...displaySettings, compactMode: e.target.checked})}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Security Settings */}
+            {activeTab === "security" && (
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
+                  <Shield className="w-6 h-6" />
+                  <span>Security Settings</span>
+                </h2>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <Key className="w-5 h-5 text-green-400" />
                         <div>
-                          <h4 className="text-white font-medium">Show Balance</h4>
-                          <p className="text-sm text-gray-400">Display token balances in wallet</p>
+                          <h3 className="text-white font-medium">Two-Factor Authentication</h3>
+                          <p className="text-sm text-gray-400">Add an extra layer of security to your account</p>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={privacy.showBalance}
-                            onChange={(e) => setPrivacy({...privacy, showBalance: e.target.checked})}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
+                      </div>
+                      <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                        {securitySettings.twoFactor ? "Disable" : "Enable"}
+                      </button>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                      <div className="flex items-center space-x-3">
+                        <Lock className="w-5 h-5 text-orange-400" />
+                        <div>
+                          <h3 className="text-white font-medium">Auto Lock</h3>
+                          <p className="text-sm text-gray-400">Automatically lock the app after inactivity</p>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={securitySettings.autoLock}
+                          onChange={(e) => setSecuritySettings({...securitySettings, autoLock: e.target.checked})}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      </label>
+                    </div>
+                    
+                    <div className="p-4 bg-white/5 rounded-xl">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-white font-medium">Session Timeout</h3>
+                        <span className="text-blue-400 font-semibold">{securitySettings.sessionTimeout} minutes</span>
+                      </div>
+                      <p className="text-sm text-gray-400 mb-4">Automatically log out after this period of inactivity</p>
+                      <input
+                        type="range"
+                        min="5"
+                        max="120"
+                        step="5"
+                        value={securitySettings.sessionTimeout}
+                        onChange={(e) => setSecuritySettings({...securitySettings, sessionTimeout: parseInt(e.target.value)})}
+                        className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div className="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>5 min</span>
+                        <span>120 min</span>
                       </div>
                     </div>
                   </div>
@@ -396,60 +583,56 @@ export default function Settings() {
               </div>
             )}
 
-            {activeTab === "security" && (
+            {/* Network Settings */}
+            {activeTab === "network" && (
               <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-                <h2 className="text-2xl font-bold text-white mb-6">Security Settings</h2>
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center space-x-2">
+                  <Network className="w-6 h-6" />
+                  <span>Network Settings</span>
+                </h2>
                 <div className="space-y-6">
                   <div className="p-4 bg-white/5 rounded-xl">
-                    <div className="flex items-center justify-between">
+                    <h3 className="text-white font-medium mb-4">Current Network</h3>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                      <span className="text-green-400 font-semibold">Sepolia Testnet</span>
+                    </div>
+                    <p className="text-sm text-gray-400 mt-2">Connected to Ethereum Sepolia test network</p>
+                  </div>
+                  
+                  <div className="p-4 bg-white/5 rounded-xl">
+                    <h3 className="text-white font-medium mb-4">Contract Addresses</h3>
+                    <div className="space-y-3">
                       <div>
-                        <h3 className="text-white font-medium">Two-Factor Authentication</h3>
-                        <p className="text-sm text-gray-400">Add an extra layer of security to your account</p>
+                        <p className="text-sm text-gray-400">G8S Token</p>
+                        <p className="text-white font-mono text-sm">0xCe28Eb32bbd8c66749b227A860beFcC12e612295</p>
                       </div>
-                      <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-                        Enable
-                      </button>
+                      <div>
+                        <p className="text-sm text-gray-400">PUSD Token</p>
+                        <p className="text-white font-mono text-sm">0xe1976f47c72409aE1De3572403E4D3E8EF447289</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400">IDO Contract</p>
+                        <p className="text-white font-mono text-sm">0x182a1b31e2C57B44D6700eEBBD6733511b559782</p>
+                      </div>
                     </div>
                   </div>
                   
                   <div className="p-4 bg-white/5 rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-white font-medium">Change Password</h3>
-                        <p className="text-sm text-gray-400">Update your account password</p>
+                    <h3 className="text-white font-medium mb-4">RPC Endpoints</h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-400">Primary RPC</span>
+                        <span className="text-white text-sm">sepolia.drpc.org</span>
                       </div>
-                      <button className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 transition-colors">
-                        Change
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-white/5 rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-white font-medium">Export Data</h3>
-                        <p className="text-sm text-gray-400">Download your account data</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-400">Backup RPC</span>
+                        <span className="text-white text-sm">rpc.sepolia.org</span>
                       </div>
-                      <button 
-                        onClick={exportData}
-                        className="px-4 py-2 bg-white/10 border border-white/20 text-white rounded-lg hover:bg-white/20 transition-colors flex items-center space-x-2"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>Export</span>
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-red-400 font-medium">Delete Account</h3>
-                        <p className="text-sm text-gray-400">Permanently delete your account and all data</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-400">Status</span>
+                        <span className="text-green-400 text-sm">Connected</span>
                       </div>
-                      <button className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center space-x-2">
-                        <Trash2 className="w-4 h-4" />
-                        <span>Delete</span>
-                      </button>
                     </div>
                   </div>
                 </div>
